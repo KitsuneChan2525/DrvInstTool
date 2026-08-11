@@ -74,6 +74,8 @@ enum class TextId
 	Win7Sp1Required,
 	UnsupportedSystemConfig,
 	VersionDetectionFailed,
+	UnsupportedSystemTitle,
+	UseCompatibleDriverPackage,
 	Count
 };
 

@@ -67,11 +67,13 @@ namespace
 		{ L"Failed to load newdev.dll: ", L"加载 newdev.dll 失败：", L"載入 newdev.dll 失敗：" },
 		{ L"UpdateDriverForPlugAndPlayDevicesW is unavailable.", L"系统不支持 UpdateDriverForPlugAndPlayDevicesW。", L"系統不支援 UpdateDriverForPlugAndPlayDevicesW。" },
 		{ L"Driver installation failed: ", L"驱动安装失败：", L"驅動程式安裝失敗：" },
-		{ L"The current system version (%s) %s does not match the driver-required system version: (%s) %s.", L"当前系统版本（%s） %s 与驱动程序所需系统版本：（%s） %s 不匹配", L"目前系統版本（%s） %s 與驅動程式所需系統版本：（%s） %s 不相符" },
-		{ L"Update to Windows Vista Service Pack 2.", L"请更新到 Windows Vista Service Pack 2。", L"請更新至 Windows Vista Service Pack 2。" },
-		{ L"Update to Windows 7 Service Pack 1.", L"请更新到 Windows 7 Service Pack 1。", L"請更新至 Windows 7 Service Pack 1。" },
+		{ L"Current system version: %s %s (%s)\nDriver-required system version: %s %s (%s)", L"当前系统版本：%s %s (%s)\n驱动程序所需系统版本：%s %s (%s)", L"目前系統版本：%s %s (%s)\n驅動程式所需系統版本：%s %s (%s)" },
+		{ L"Update the operating system to Service Pack 2 before continuing driver installation.", L"请更新操作系统至 Service Pack 2 后继续执行驱动程序安装", L"請將作業系統更新至 Service Pack 2 後再繼續執行驅動程式安裝" },
+		{ L"Update the operating system to Service Pack 1 before continuing driver installation.", L"请更新操作系统至 Service Pack 1 后继续执行驱动程序安装", L"請將作業系統更新至 Service Pack 1 後再繼續執行驅動程式安裝" },
 		{ L"Unsupported OS or OSArch in config.json: ", L"config.json 中的 OS 或 OSArch 不受支持：", L"config.json 中的 OS 或 OSArch 不受支援：" },
-		{ L"Failed to detect the Windows version.", L"检测 Windows 版本失败。", L"偵測 Windows 版本失敗。" }
+		{ L"Failed to detect the Windows version.", L"检测 Windows 版本失败。", L"偵測 Windows 版本失敗。" },
+		{ L"Unsupported system version", L"不支持的系统版本", L"不支援的系統版本" },
+		{ L"Use a compatible driver package before continuing driver installation.", L"请更换至兼容的驱动程序包后继续执行驱动程序安装", L"請更換為相容的驅動程式套件後再繼續執行驅動程式安裝" }
 	};
 }
 

@@ -554,7 +554,7 @@ namespace
 		return std::to_wstring(majorVersion) + L"." + std::to_wstring(minorVersion) + L"." + std::to_wstring(buildNumber);
 	}
 
-	std::wstring CurrentVersionDescription(const DetectedWindowsVersion& version)
+	std::wstring CurrentSystemName(const DetectedWindowsVersion& version)
 	{
 		std::wstring name = L"Windows";
 		if (version.majorVersion == 6 && version.minorVersion == 0) name = L"Windows Vista";
@@ -562,7 +562,25 @@ namespace
 		else if (version.majorVersion == 6 && version.minorVersion == 2) name = L"Windows 8";
 		else if (version.majorVersion == 6 && version.minorVersion == 3) name = L"Windows 8.1";
 		else if (version.majorVersion >= 10) name = version.buildNumber >= 22000 ? L"Windows 11" : L"Windows 10";
-		return name + L" " + NumericVersion(version.majorVersion, version.minorVersion, version.buildNumber);
+		return name;
+	}
+
+	std::wstring RequiredSystemName(const std::wstring& targetOs)
+	{
+		const std::wstring os = Upper(targetOs);
+		if (os == L"WINVISTA") return L"Windows Vista Service Pack 2";
+		if (os == L"WIN7") return L"Windows 7 Service Pack 1";
+		if (os == L"WIN8") return L"Windows 8 / Windows 8.1";
+		if (os == L"WIN10")
+		{
+			switch (Localization::GetLanguage())
+			{
+			case UiLanguage::ChineseSimplified: return L"Windows 10 或更高版本";
+			case UiLanguage::ChineseTraditional: return L"Windows 10 或更新版本";
+			default: return L"Windows 10 or later";
+			}
+		}
+		return {};
 	}
 }
 
@@ -575,21 +593,21 @@ bool SystemCompatibility::IsVersionSupported(const std::wstring& targetOs, unsig
 	const std::wstring os = Upper(targetOs);
 	if (os == L"WINVISTA")
 	{
-		requiredVersion = L"Windows Vista 6.0.6002";
+		requiredVersion = L"6.0.6002";
 		if (majorVersion == 6 && minorVersion == 0 && (buildNumber == 6000 || buildNumber == 6001))
 			updateHint = Tr(TextId::VistaSp2Required);
 		return majorVersion == 6 && minorVersion == 0 && buildNumber == 6002;
 	}
 	if (os == L"WIN7")
 	{
-		requiredVersion = L"Windows 7 6.1.7601";
+		requiredVersion = L"6.1.7601";
 		if (majorVersion == 6 && minorVersion == 1 && buildNumber == 7600)
 			updateHint = Tr(TextId::Win7Sp1Required);
 		return majorVersion == 6 && minorVersion == 1 && buildNumber == 7601;
 	}
 	if (os == L"WIN8")
 	{
-		requiredVersion = L"Windows 8 6.2.9200 / Windows 8.1 6.3.9600";
+		requiredVersion = L"6.2.9200 / 6.3.9600";
 		return (majorVersion == 6 && minorVersion == 2 && buildNumber == 9200) ||
 			(majorVersion == 6 && minorVersion == 3 && buildNumber == 9600);
 	}
@@ -597,9 +615,9 @@ bool SystemCompatibility::IsVersionSupported(const std::wstring& targetOs, unsig
 	{
 		switch (Localization::GetLanguage())
 		{
-		case UiLanguage::ChineseSimplified: requiredVersion = L"Windows 10 10.0.10240 或更高版本"; break;
-		case UiLanguage::ChineseTraditional: requiredVersion = L"Windows 10 10.0.10240 或更新版本"; break;
-		default: requiredVersion = L"Windows 10 10.0.10240 or later"; break;
+		case UiLanguage::ChineseSimplified: requiredVersion = L"10.0.10240 或更高版本"; break;
+		case UiLanguage::ChineseTraditional: requiredVersion = L"10.0.10240 或更新版本"; break;
+		default: requiredVersion = L"10.0.10240 or later"; break;
 		}
 		return majorVersion > 10 || (majorVersion == 10 &&
 			(minorVersion > 0 || (minorVersion == 0 && buildNumber >= 10240)));
@@ -617,10 +635,10 @@ bool SystemCompatibility::ValidateDriverMedia(const std::wstring& dataRoot, std:
 		return false;
 	}
 	const std::wstring requiredArchitecture = NormalizeArchitecture(config.osArchitecture);
+	const std::wstring requiredSystemName = RequiredSystemName(config.os);
 	std::wstring requiredVersion;
 	std::wstring updateHint;
-	if (requiredArchitecture.empty() ||
-		!IsVersionSupported(config.os, 0, 0, 0, requiredVersion, updateHint) && requiredVersion.empty())
+	if (requiredArchitecture.empty() || requiredSystemName.empty())
 	{
 		error = std::wstring(Tr(TextId::UnsupportedSystemConfig)) + config.os + L" / " + config.osArchitecture;
 		return false;
@@ -638,10 +656,11 @@ bool SystemCompatibility::ValidateDriverMedia(const std::wstring& dataRoot, std:
 	if (versionMatches && architectureMatches) return true;
 
 	CString message;
-	message.Format(Tr(TextId::SystemMismatchFormat), CurrentVersionDescription(current).c_str(),
-		current.architecture.c_str(), requiredVersion.c_str(), requiredArchitecture.c_str());
+	message.Format(Tr(TextId::SystemMismatchFormat), CurrentSystemName(current).c_str(),
+		current.architecture.c_str(), NumericVersion(current.majorVersion, current.minorVersion, current.buildNumber).c_str(),
+		requiredSystemName.c_str(), requiredArchitecture.c_str(), requiredVersion.c_str());
 	error = message.GetString();
-	if (!updateHint.empty()) error += L"\n" + updateHint;
+	error += L"\n" + (updateHint.empty() ? std::wstring(Tr(TextId::UseCompatibleDriverPackage)) : updateHint);
 	return false;
 }
 

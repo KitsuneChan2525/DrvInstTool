@@ -67,6 +67,11 @@ namespace
 			DispatchMessageW(&message);
 		}
 	}
+
+	void ShowSystemCompatibilityError(HWND owner, const std::wstring& message)
+	{
+		MessageBoxW(owner, message.c_str(), Tr(TextId::UnsupportedSystemTitle), MB_OK | MB_ICONERROR);
+	}
 }
 
 IMPLEMENT_DYNCREATE(CkitsuneDrvInstallerView, CView)
@@ -148,7 +153,7 @@ void CkitsuneDrvInstallerView::OnInitialUpdate()
 		!SystemCompatibility::ValidateDriverMedia(dataRoot, compatibilityError))
 	{
 		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + compatibilityError);
-		AfxMessageBox(compatibilityError.c_str(), MB_ICONERROR);
+		ShowSystemCompatibilityError(GetSafeHwnd(), compatibilityError);
 	}
 }
 
@@ -257,7 +262,7 @@ void CkitsuneDrvInstallerView::OnScan()
 	if (!SystemCompatibility::ValidateDriverMedia(root, error))
 	{
 		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + error);
-		AfxMessageBox(error.c_str(), MB_ICONERROR);
+		ShowSystemCompatibilityError(GetSafeHwnd(), error);
 		return;
 	}
 	SetBusy(true, Tr(TextId::LoadingIndex));
@@ -329,7 +334,7 @@ void CkitsuneDrvInstallerView::OnInstall()
 	if (!SystemCompatibility::ValidateDriverMedia(root, compatibilityError))
 	{
 		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + compatibilityError);
-		AfxMessageBox(compatibilityError.c_str(), MB_ICONERROR);
+		ShowSystemCompatibilityError(GetSafeHwnd(), compatibilityError);
 		return;
 	}
 	const std::wstring sevenZip = DriverInstaller::Find7Zip(root);
