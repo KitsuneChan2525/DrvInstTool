@@ -81,6 +81,7 @@ BEGIN_MESSAGE_MAP(CkitsuneDrvInstallerView, CView)
 	ON_WM_SIZE()
 	ON_WM_ERASEBKGND()
 	ON_BN_CLICKED(IDC_BROWSE, &CkitsuneDrvInstallerView::OnBrowse)
+	ON_EN_CHANGE(IDC_DATA_ROOT, &CkitsuneDrvInstallerView::OnDataRootChanged)
 	ON_BN_CLICKED(IDC_SCAN, &CkitsuneDrvInstallerView::OnScan)
 	ON_BN_CLICKED(IDC_SELECT_RECOMMENDED, &CkitsuneDrvInstallerView::OnSelectRecommended)
 	ON_BN_CLICKED(IDC_INSTALL, &CkitsuneDrvInstallerView::OnInstall)
@@ -145,6 +146,7 @@ void CkitsuneDrvInstallerView::OnInitialUpdate()
 	CView::OnInitialUpdate();
 	const std::wstring dataRoot = DetectDataRoot();
 	m_dataRoot.SetWindowTextW(dataRoot.c_str());
+	UpdateSubtitle();
 	if (GetParentFrame()) GetParentFrame()->SetWindowTextW(Tr(TextId::ViewTitle));
 	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(Tr(TextId::AppTitle));
 	std::wstring compatibilityError;
@@ -246,6 +248,11 @@ void CkitsuneDrvInstallerView::OnBrowse()
 	wchar_t path[MAX_PATH] = {};
 	if (SHGetPathFromIDListW(item, path)) m_dataRoot.SetWindowTextW(path);
 	CoTaskMemFree(item);
+}
+
+void CkitsuneDrvInstallerView::OnDataRootChanged()
+{
+	UpdateSubtitle();
 }
 
 void CkitsuneDrvInstallerView::OnScan()
@@ -381,7 +388,7 @@ void CkitsuneDrvInstallerView::OnInstall()
 void CkitsuneDrvInstallerView::ApplyLanguage()
 {
 	m_title.SetWindowTextW(Tr(TextId::AppTitle));
-	m_subtitle.SetWindowTextW(Tr(TextId::Subtitle));
+	UpdateSubtitle();
 	m_languageLabel.SetWindowTextW(Tr(TextId::Language));
 	m_dataLabel.SetWindowTextW(Tr(TextId::DataDirectory));
 	m_browse.SetWindowTextW(Tr(TextId::Browse));
@@ -404,6 +411,18 @@ void CkitsuneDrvInstallerView::ApplyLanguage()
 	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(Tr(TextId::AppTitle));
 	if (!m_matches.empty()) RefreshDeviceList();
 	Invalidate();
+}
+
+void CkitsuneDrvInstallerView::UpdateSubtitle()
+{
+	std::wstring targetSystem;
+	std::wstring targetArchitecture;
+	if (SystemCompatibility::GetDriverMediaTarget(CurrentDataRoot(), targetSystem, targetArchitecture))
+	{
+		m_subtitle.SetWindowTextW((targetSystem + L" " + targetArchitecture).c_str());
+		return;
+	}
+	m_subtitle.SetWindowTextW(Tr(TextId::Subtitle));
 }
 
 void CkitsuneDrvInstallerView::OnLanguageChanged()

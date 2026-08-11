@@ -102,6 +102,10 @@ namespace
 		const bool compatibilityRulesOk = SystemCompatibility::RunRuleTests(compatibilityError);
 		std::wstring mediaCompatibilityError;
 		const bool mediaCompatibilityOk = SystemCompatibility::ValidateDriverMedia(dataRoot, mediaCompatibilityError);
+		std::wstring mediaTargetSystem;
+		std::wstring mediaTargetArchitecture;
+		const bool mediaTargetOk = SystemCompatibility::GetDriverMediaTarget(
+			dataRoot, mediaTargetSystem, mediaTargetArchitecture);
 		const bool catalogLoaded = catalog.Load(dataRoot, error);
 		std::vector<DeviceMatch> matches;
 		int scanned = 0;
@@ -114,6 +118,9 @@ namespace
 			<< "  \"compatibility_error\": \"" << JsonEscapeUtf8(compatibilityError) << "\",\n"
 			<< "  \"media_compatibility_ok\": " << (mediaCompatibilityOk ? "true" : "false") << ",\n"
 			<< "  \"media_compatibility_error\": \"" << JsonEscapeUtf8(mediaCompatibilityError) << "\",\n"
+			<< "  \"media_target_ok\": " << (mediaTargetOk ? "true" : "false") << ",\n"
+			<< "  \"media_target_system\": \"" << JsonEscapeUtf8(mediaTargetSystem) << "\",\n"
+			<< "  \"media_target_architecture\": \"" << JsonEscapeUtf8(mediaTargetArchitecture) << "\",\n"
 			<< "  \"catalog_loaded\": " << (catalogLoaded ? "true" : "false") << ",\n"
 			<< "  \"driver_count\": " << catalog.DriverCount() << ",\n"
 			<< "  \"hardware_id_count\": " << catalog.HardwareIdCount() << ",\n"

@@ -47,6 +47,7 @@ protected:
 	void AppendLog(const std::wstring& text);
 	void SetBusy(bool busy, const wchar_t* status);
 	void RefreshDeviceList();
+	void UpdateSubtitle();
 	void ApplyLanguage();
 	std::wstring CurrentDataRoot() const;
 
@@ -54,6 +55,7 @@ protected:
 	afx_msg void OnSize(UINT type, int cx, int cy);
 	afx_msg BOOL OnEraseBkgnd(CDC* dc);
 	afx_msg void OnBrowse();
+	afx_msg void OnDataRootChanged();
 	afx_msg void OnScan();
 	afx_msg void OnSelectRecommended();
 	afx_msg void OnInstall();

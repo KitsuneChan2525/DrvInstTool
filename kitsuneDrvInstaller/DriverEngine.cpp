@@ -582,6 +582,16 @@ namespace
 		}
 		return {};
 	}
+
+	std::wstring DriverMediaSystemName(const std::wstring& targetOs)
+	{
+		const std::wstring os = Upper(targetOs);
+		if (os == L"WINVISTA") return L"Windows Vista";
+		if (os == L"WIN7") return L"Windows 7";
+		if (os == L"WIN8") return L"Windows 8 / Windows 8.1";
+		if (os == L"WIN10") return L"Windows 10";
+		return {};
+	}
 }
 
 bool SystemCompatibility::IsVersionSupported(const std::wstring& targetOs, unsigned long majorVersion,
@@ -623,6 +633,18 @@ bool SystemCompatibility::IsVersionSupported(const std::wstring& targetOs, unsig
 			(minorVersion > 0 || (minorVersion == 0 && buildNumber >= 10240)));
 	}
 	return false;
+}
+
+bool SystemCompatibility::GetDriverMediaTarget(const std::wstring& dataRoot, std::wstring& targetSystem,
+	std::wstring& targetArchitecture)
+{
+	targetSystem.clear();
+	targetArchitecture.clear();
+	DriverMediaConfig config;
+	if (!LoadConfig(JoinPath(dataRoot, L"config.json"), config)) return false;
+	targetSystem = DriverMediaSystemName(config.os);
+	targetArchitecture = NormalizeArchitecture(config.osArchitecture);
+	return !targetSystem.empty() && !targetArchitecture.empty();
 }
 
 bool SystemCompatibility::ValidateDriverMedia(const std::wstring& dataRoot, std::wstring& error)

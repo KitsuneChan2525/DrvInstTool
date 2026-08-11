@@ -9,7 +9,7 @@ namespace
 	{
 		{ L"kitsune Driver Installer", L"kitsune 驱动安装程序", L"kitsune 驅動程式安裝程式" },
 		{ L"Driver installation", L"驱动安装", L"驅動程式安裝" },
-		{ L"Windows 7 x64 · Local intelligent driver matching", L"Windows 7 x64 · 本地驱动智能匹配", L"Windows 7 x64 · 本機驅動程式智慧比對" },
+		{ L"Driver package target system", L"驱动程序包目标系统", L"驅動程式套件目標系統" },
 		{ L"Language", L"语言", L"語言" },
 		{ L"English", L"英语", L"英文" },
 		{ L"Simplified Chinese", L"简体中文", L"簡體中文" },
