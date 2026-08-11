@@ -98,6 +98,10 @@ namespace
 		const std::wstring reportPath = option + 2 < count ? arguments[option + 2] : L"driver-installer-self-test.json";
 		DriverCatalog catalog;
 		std::wstring error;
+		std::wstring compatibilityError;
+		const bool compatibilityRulesOk = SystemCompatibility::RunRuleTests(compatibilityError);
+		std::wstring mediaCompatibilityError;
+		const bool mediaCompatibilityOk = SystemCompatibility::ValidateDriverMedia(dataRoot, mediaCompatibilityError);
 		const bool catalogLoaded = catalog.Load(dataRoot, error);
 		std::vector<DeviceMatch> matches;
 		int scanned = 0;
@@ -106,6 +110,10 @@ namespace
 		const std::wstring sevenZip = DriverInstaller::Find7Zip(dataRoot);
 		std::ofstream report(reportPath, std::ios::binary | std::ios::trunc);
 		report << "{\n"
+			<< "  \"compatibility_rules_ok\": " << (compatibilityRulesOk ? "true" : "false") << ",\n"
+			<< "  \"compatibility_error\": \"" << JsonEscapeUtf8(compatibilityError) << "\",\n"
+			<< "  \"media_compatibility_ok\": " << (mediaCompatibilityOk ? "true" : "false") << ",\n"
+			<< "  \"media_compatibility_error\": \"" << JsonEscapeUtf8(mediaCompatibilityError) << "\",\n"
 			<< "  \"catalog_loaded\": " << (catalogLoaded ? "true" : "false") << ",\n"
 			<< "  \"driver_count\": " << catalog.DriverCount() << ",\n"
 			<< "  \"hardware_id_count\": " << catalog.HardwareIdCount() << ",\n"

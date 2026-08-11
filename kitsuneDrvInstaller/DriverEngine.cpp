@@ -218,6 +218,13 @@ namespace
 		std::wstring index;
 	};
 
+	struct DriverMediaConfig
+	{
+		std::wstring os;
+		std::wstring osArchitecture;
+		std::vector<PackageConfig> packages;
+	};
+
 	bool ParseStringField(JsonReader& reader, std::wstring& output)
 	{
 		std::string value;
@@ -243,7 +250,7 @@ namespace
 		}
 	}
 
-	bool LoadConfig(const std::wstring& path, std::vector<PackageConfig>& packages)
+	bool LoadConfig(const std::wstring& path, DriverMediaConfig& config)
 	{
 		std::string data;
 		if (!ReadAllBytes(path, data)) return false;
@@ -254,16 +261,25 @@ namespace
 		{
 			std::string key;
 			if (!reader.ParseString(key) || !reader.Consume(':')) return false;
-			if (key == "DriverPackages")
+			if (key == "OS")
+			{
+				if (!ParseStringField(reader, config.os)) return false;
+			}
+			else if (key == "OSArch")
+			{
+				if (!ParseStringField(reader, config.osArchitecture)) return false;
+			}
+			else if (key == "DriverPackages")
 			{
 				if (!reader.Consume('[')) return false;
 				if (!reader.Consume(']'))
 				{
 					for (;;)
 					{
-						PackageConfig config;
-						if (!ParseConfigObject(reader, config)) return false;
-						if (!config.category.empty() && !config.directory.empty() && !config.index.empty()) packages.push_back(config);
+						PackageConfig package;
+						if (!ParseConfigObject(reader, package)) return false;
+						if (!package.category.empty() && !package.directory.empty() && !package.index.empty())
+							config.packages.push_back(package);
 						if (reader.Consume(']')) break;
 						if (!reader.Consume(',')) return false;
 					}
@@ -481,20 +497,216 @@ namespace
 		const size_t slash = path.find_last_of(L"\\/");
 		return slash == std::wstring::npos ? std::wstring() : path.substr(0, slash);
 	}
+
+	struct DetectedWindowsVersion
+	{
+		unsigned long majorVersion = 0;
+		unsigned long minorVersion = 0;
+		unsigned long buildNumber = 0;
+		std::wstring architecture;
+	};
+
+	std::wstring NormalizeArchitecture(const std::wstring& architecture)
+	{
+		const std::wstring value = Upper(architecture);
+		if (value == L"X64" || value == L"AMD64") return L"x64";
+		if (value == L"X86" || value == L"I386" || value == L"WIN32") return L"x86";
+		return {};
+	}
+
+	bool DetectWindowsVersion(DetectedWindowsVersion& version)
+	{
+		struct RtlVersionInfo
+		{
+			ULONG size;
+			ULONG majorVersion;
+			ULONG minorVersion;
+			ULONG buildNumber;
+			ULONG platformId;
+			WCHAR servicePack[128];
+		};
+		using RtlGetVersionFunction = LONG(WINAPI*)(RtlVersionInfo*);
+		HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+		RtlGetVersionFunction rtlGetVersion = ntdll == nullptr ? nullptr :
+			reinterpret_cast<RtlGetVersionFunction>(GetProcAddress(ntdll, "RtlGetVersion"));
+		if (rtlGetVersion == nullptr) return false;
+		RtlVersionInfo info = {};
+		info.size = sizeof(info);
+		if (rtlGetVersion(&info) < 0) return false;
+		version.majorVersion = info.majorVersion;
+		version.minorVersion = info.minorVersion;
+		version.buildNumber = info.buildNumber;
+
+		SYSTEM_INFO systemInfo = {};
+		GetNativeSystemInfo(&systemInfo);
+		switch (systemInfo.wProcessorArchitecture)
+		{
+		case PROCESSOR_ARCHITECTURE_AMD64: version.architecture = L"x64"; break;
+		case PROCESSOR_ARCHITECTURE_INTEL: version.architecture = L"x86"; break;
+		case 12: version.architecture = L"ARM64"; break;
+		default: version.architecture = L"unknown"; break;
+		}
+		return true;
+	}
+
+	std::wstring NumericVersion(unsigned long majorVersion, unsigned long minorVersion, unsigned long buildNumber)
+	{
+		return std::to_wstring(majorVersion) + L"." + std::to_wstring(minorVersion) + L"." + std::to_wstring(buildNumber);
+	}
+
+	std::wstring CurrentVersionDescription(const DetectedWindowsVersion& version)
+	{
+		std::wstring name = L"Windows";
+		if (version.majorVersion == 6 && version.minorVersion == 0) name = L"Windows Vista";
+		else if (version.majorVersion == 6 && version.minorVersion == 1) name = L"Windows 7";
+		else if (version.majorVersion == 6 && version.minorVersion == 2) name = L"Windows 8";
+		else if (version.majorVersion == 6 && version.minorVersion == 3) name = L"Windows 8.1";
+		else if (version.majorVersion >= 10) name = version.buildNumber >= 22000 ? L"Windows 11" : L"Windows 10";
+		return name + L" " + NumericVersion(version.majorVersion, version.minorVersion, version.buildNumber);
+	}
+}
+
+bool SystemCompatibility::IsVersionSupported(const std::wstring& targetOs, unsigned long majorVersion,
+	unsigned long minorVersion, unsigned long buildNumber, std::wstring& requiredVersion,
+	std::wstring& updateHint)
+{
+	requiredVersion.clear();
+	updateHint.clear();
+	const std::wstring os = Upper(targetOs);
+	if (os == L"WINVISTA")
+	{
+		requiredVersion = L"Windows Vista 6.0.6002";
+		if (majorVersion == 6 && minorVersion == 0 && (buildNumber == 6000 || buildNumber == 6001))
+			updateHint = Tr(TextId::VistaSp2Required);
+		return majorVersion == 6 && minorVersion == 0 && buildNumber == 6002;
+	}
+	if (os == L"WIN7")
+	{
+		requiredVersion = L"Windows 7 6.1.7601";
+		if (majorVersion == 6 && minorVersion == 1 && buildNumber == 7600)
+			updateHint = Tr(TextId::Win7Sp1Required);
+		return majorVersion == 6 && minorVersion == 1 && buildNumber == 7601;
+	}
+	if (os == L"WIN8")
+	{
+		requiredVersion = L"Windows 8 6.2.9200 / Windows 8.1 6.3.9600";
+		return (majorVersion == 6 && minorVersion == 2 && buildNumber == 9200) ||
+			(majorVersion == 6 && minorVersion == 3 && buildNumber == 9600);
+	}
+	if (os == L"WIN10")
+	{
+		switch (Localization::GetLanguage())
+		{
+		case UiLanguage::ChineseSimplified: requiredVersion = L"Windows 10 10.0.10240 或更高版本"; break;
+		case UiLanguage::ChineseTraditional: requiredVersion = L"Windows 10 10.0.10240 或更新版本"; break;
+		default: requiredVersion = L"Windows 10 10.0.10240 or later"; break;
+		}
+		return majorVersion > 10 || (majorVersion == 10 &&
+			(minorVersion > 0 || (minorVersion == 0 && buildNumber >= 10240)));
+	}
+	return false;
+}
+
+bool SystemCompatibility::ValidateDriverMedia(const std::wstring& dataRoot, std::wstring& error)
+{
+	const std::wstring configPath = JoinPath(dataRoot, L"config.json");
+	DriverMediaConfig config;
+	if (!LoadConfig(configPath, config))
+	{
+		error = std::wstring(Tr(TextId::ConfigInvalid)) + configPath;
+		return false;
+	}
+	const std::wstring requiredArchitecture = NormalizeArchitecture(config.osArchitecture);
+	std::wstring requiredVersion;
+	std::wstring updateHint;
+	if (requiredArchitecture.empty() ||
+		!IsVersionSupported(config.os, 0, 0, 0, requiredVersion, updateHint) && requiredVersion.empty())
+	{
+		error = std::wstring(Tr(TextId::UnsupportedSystemConfig)) + config.os + L" / " + config.osArchitecture;
+		return false;
+	}
+
+	DetectedWindowsVersion current;
+	if (!DetectWindowsVersion(current))
+	{
+		error = Tr(TextId::VersionDetectionFailed);
+		return false;
+	}
+	const bool versionMatches = IsVersionSupported(config.os, current.majorVersion, current.minorVersion,
+		current.buildNumber, requiredVersion, updateHint);
+	const bool architectureMatches = current.architecture == requiredArchitecture;
+	if (versionMatches && architectureMatches) return true;
+
+	CString message;
+	message.Format(Tr(TextId::SystemMismatchFormat), CurrentVersionDescription(current).c_str(),
+		current.architecture.c_str(), requiredVersion.c_str(), requiredArchitecture.c_str());
+	error = message.GetString();
+	if (!updateHint.empty()) error += L"\n" + updateHint;
+	return false;
+}
+
+bool SystemCompatibility::RunRuleTests(std::wstring& error)
+{
+	struct TestCase
+	{
+		const wchar_t* os;
+		unsigned long majorVersion;
+		unsigned long minorVersion;
+		unsigned long buildNumber;
+		bool expected;
+		bool expectsUpdateHint;
+	};
+	const TestCase cases[] =
+	{
+		{ L"WinVista", 6, 0, 6002, true, false },
+		{ L"WinVista", 6, 0, 6000, false, true },
+		{ L"WinVista", 6, 0, 6001, false, true },
+		{ L"Win7", 6, 1, 7601, true, false },
+		{ L"Win7", 6, 1, 7600, false, true },
+		{ L"Win8", 6, 2, 9200, true, false },
+		{ L"Win8", 6, 3, 9600, true, false },
+		// Negative case: reject an invalid Win8/8.1 version-and-build pairing.
+		{ L"Win8", 6, 3, 9200, false, false },
+		{ L"Win10", 10, 0, 10240, true, false },
+		// Negative boundary: reject the build immediately below the Win10 RTM minimum.
+		{ L"Win10", 10, 0, 10239, false, false },
+		{ L"Win10", 10, 0, 26100, true, false }
+	};
+	for (const auto& item : cases)
+	{
+		std::wstring requiredVersion;
+		std::wstring updateHint;
+		const bool actual = IsVersionSupported(item.os, item.majorVersion, item.minorVersion,
+			item.buildNumber, requiredVersion, updateHint);
+		if (actual != item.expected || (!updateHint.empty()) != item.expectsUpdateHint)
+		{
+			error = std::wstring(L"Compatibility rule failed: ") + item.os + L" " +
+				NumericVersion(item.majorVersion, item.minorVersion, item.buildNumber);
+			return false;
+		}
+	}
+	if (NormalizeArchitecture(L"x64") != L"x64" || NormalizeArchitecture(L"AMD64") != L"x64" ||
+		NormalizeArchitecture(L"x86") != L"x86" || NormalizeArchitecture(L"Win32") != L"x86")
+	{
+		error = L"Architecture normalization failed";
+		return false;
+	}
+	error.clear();
+	return true;
 }
 
 bool DriverCatalog::Load(const std::wstring& dataRoot, std::wstring& error)
 {
 	m_drivers.clear();
 	m_hardwareIds.clear();
-	std::vector<PackageConfig> packages;
+	DriverMediaConfig config;
 	const std::wstring configPath = JoinPath(dataRoot, L"config.json");
-	if (!LoadConfig(configPath, packages) || packages.empty())
+	if (!LoadConfig(configPath, config) || config.packages.empty())
 	{
 		error = std::wstring(Tr(TextId::ConfigInvalid)) + configPath;
 		return false;
 	}
-	for (const auto& package : packages)
+	for (const auto& package : config.packages)
 	{
 		const std::wstring path = JoinPath(JoinPath(dataRoot, package.directory), package.index);
 		if (!ParseIndex(path, package.directory, m_drivers, m_hardwareIds))

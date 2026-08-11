@@ -138,10 +138,18 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 void CkitsuneDrvInstallerView::OnInitialUpdate()
 {
 	CView::OnInitialUpdate();
-	m_dataRoot.SetWindowTextW(DetectDataRoot().c_str());
+	const std::wstring dataRoot = DetectDataRoot();
+	m_dataRoot.SetWindowTextW(dataRoot.c_str());
 	if (GetParentFrame()) GetParentFrame()->SetWindowTextW(Tr(TextId::ViewTitle));
 	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(Tr(TextId::AppTitle));
 	AppendLog(Tr(TextId::InitialLog));
+	std::wstring compatibilityError;
+	if (FileExists(JoinPath(dataRoot, L"config.json")) &&
+		!SystemCompatibility::ValidateDriverMedia(dataRoot, compatibilityError))
+	{
+		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + compatibilityError);
+		AfxMessageBox(compatibilityError.c_str(), MB_ICONERROR);
+	}
 }
 
 void CkitsuneDrvInstallerView::OnDraw(CDC*) {}
@@ -245,11 +253,17 @@ void CkitsuneDrvInstallerView::OnScan()
 		AfxMessageBox(Tr(TextId::DataConfigMissing), MB_ICONWARNING);
 		return;
 	}
+	std::wstring error;
+	if (!SystemCompatibility::ValidateDriverMedia(root, error))
+	{
+		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + error);
+		AfxMessageBox(error.c_str(), MB_ICONERROR);
+		return;
+	}
 	SetBusy(true, Tr(TextId::LoadingIndex));
 	m_progress.SetRange32(0, 100);
 	m_progress.SetPos(12);
 	AppendLog(std::wstring(Tr(TextId::LoadingIndex)) + L" " + root);
-	std::wstring error;
 	if (!m_catalog.Load(root, error))
 	{
 		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + error);
@@ -311,6 +325,13 @@ void CkitsuneDrvInstallerView::OnInstall()
 		return;
 	}
 	const std::wstring root = CurrentDataRoot();
+	std::wstring compatibilityError;
+	if (!SystemCompatibility::ValidateDriverMedia(root, compatibilityError))
+	{
+		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + compatibilityError);
+		AfxMessageBox(compatibilityError.c_str(), MB_ICONERROR);
+		return;
+	}
 	const std::wstring sevenZip = DriverInstaller::Find7Zip(root);
 	if (sevenZip.empty())
 	{

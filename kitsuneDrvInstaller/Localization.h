@@ -69,6 +69,11 @@ enum class TextId
 	NewDevLoadFailed,
 	UpdateApiUnsupported,
 	DriverInstallFailed,
+	SystemMismatchFormat,
+	VistaSp2Required,
+	Win7Sp1Required,
+	UnsupportedSystemConfig,
+	VersionDetectionFailed,
 	Count
 };
 

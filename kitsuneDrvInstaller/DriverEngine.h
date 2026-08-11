@@ -56,6 +56,16 @@ public:
 		int& scannedDeviceCount, std::wstring& error);
 };
 
+class SystemCompatibility
+{
+public:
+	static bool ValidateDriverMedia(const std::wstring& dataRoot, std::wstring& error);
+	static bool IsVersionSupported(const std::wstring& targetOs, unsigned long majorVersion,
+		unsigned long minorVersion, unsigned long buildNumber, std::wstring& requiredVersion,
+		std::wstring& updateHint);
+	static bool RunRuleTests(std::wstring& error);
+};
+
 class DriverInstaller
 {
 public:
