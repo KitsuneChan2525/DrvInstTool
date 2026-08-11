@@ -28,7 +28,6 @@ namespace
 		{ L"Package", L"驱动包", L"驅動程式套件" },
 		{ L"Status", L"状态", L"狀態" },
 		{ L"Operation log", L"操作日志", L"操作記錄" },
-		{ L"Select the Data directory and scan this computer. The application uses 7z.exe from the sibling bin directory.", L"请选择驱动数据目录，然后扫描本机硬件。程序固定优先调用与 Data 同级 bin 目录内的 7z.exe。", L"請選擇驅動程式資料目錄，然後掃描本機硬體。程式固定優先使用與 Data 同層 bin 目錄內的 7z.exe。" },
 		{ L"Select the Data directory containing config.json", L"选择包含 config.json 的 Data 目录", L"選擇包含 config.json 的 Data 目錄" },
 		{ L"Missing - recommended", L"缺失，建议安装", L"缺少，建議安裝" },
 		{ L"Installed - update available", L"已安装，可更新", L"已安裝，可更新" },

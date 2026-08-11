@@ -147,7 +147,6 @@ void CkitsuneDrvInstallerView::OnInitialUpdate()
 	m_dataRoot.SetWindowTextW(dataRoot.c_str());
 	if (GetParentFrame()) GetParentFrame()->SetWindowTextW(Tr(TextId::ViewTitle));
 	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(Tr(TextId::AppTitle));
-	AppendLog(Tr(TextId::InitialLog));
 	std::wstring compatibilityError;
 	if (FileExists(JoinPath(dataRoot, L"config.json")) &&
 		!SystemCompatibility::ValidateDriverMedia(dataRoot, compatibilityError))

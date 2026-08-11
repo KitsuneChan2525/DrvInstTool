@@ -30,7 +30,6 @@ enum class TextId
 	ColumnPackage,
 	ColumnStatus,
 	OperationLog,
-	InitialLog,
 	BrowseTitle,
 	MissingDriver,
 	InstalledUpdate,
