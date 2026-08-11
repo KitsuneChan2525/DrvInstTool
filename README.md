@@ -10,7 +10,7 @@
 - 按硬件 ID 精确查询 Audio、Chipset、Network、Video 索引。
 - 分列显示驱动提供商、版本和日期，并默认勾选缺少驱动的设备。
 - 仅解压匹配 INF 所在子目录，再调用 `UpdateDriverForPlugAndPlayDevicesW` 安装。
-- 自动请求管理员权限，报告单项安装结果和重启要求。
+- 报告单项安装结果和重启要求。
 
 ## 只读自检（仅Codex使用）
 
