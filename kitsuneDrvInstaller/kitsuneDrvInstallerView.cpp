@@ -151,7 +151,7 @@ void CkitsuneDrvInstallerView::OnInitialUpdate()
 	if (FileExists(JoinPath(dataRoot, L"config.json")) &&
 		!SystemCompatibility::ValidateDriverMedia(dataRoot, compatibilityError))
 	{
-		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + compatibilityError);
+		AppendLog(Tr(TextId::UnsupportedSystemLog));
 		ShowSystemCompatibilityError(GetSafeHwnd(), compatibilityError);
 	}
 }
@@ -260,7 +260,7 @@ void CkitsuneDrvInstallerView::OnScan()
 	std::wstring error;
 	if (!SystemCompatibility::ValidateDriverMedia(root, error))
 	{
-		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + error);
+		AppendLog(Tr(TextId::UnsupportedSystemLog));
 		ShowSystemCompatibilityError(GetSafeHwnd(), error);
 		return;
 	}
@@ -303,9 +303,8 @@ void CkitsuneDrvInstallerView::RefreshDeviceList()
 		const int row = m_devices.InsertItem(static_cast<int>(i), match.displayName.c_str());
 		m_devices.SetItemText(row, 1, match.driver.category.c_str());
 		m_devices.SetItemText(row, 2, match.driver.provider.c_str());
-		const std::wstring version = match.driver.driverVersion + L" / " + match.driver.driverDate;
-		m_devices.SetItemText(row, 3, version.c_str());
-		m_devices.SetItemText(row, 4, match.driver.archiveFile.c_str());
+		m_devices.SetItemText(row, 3, match.driver.driverVersion.c_str());
+		m_devices.SetItemText(row, 4, match.driver.driverDate.c_str());
 		m_devices.SetItemText(row, 5, match.needsDriver ? Tr(TextId::MissingDriver) : Tr(TextId::InstalledUpdate));
 		m_devices.SetCheck(row, match.needsDriver ? TRUE : FALSE);
 	}
@@ -332,7 +331,7 @@ void CkitsuneDrvInstallerView::OnInstall()
 	std::wstring compatibilityError;
 	if (!SystemCompatibility::ValidateDriverMedia(root, compatibilityError))
 	{
-		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + compatibilityError);
+		AppendLog(Tr(TextId::UnsupportedSystemLog));
 		ShowSystemCompatibilityError(GetSafeHwnd(), compatibilityError);
 		return;
 	}
@@ -393,7 +392,7 @@ void CkitsuneDrvInstallerView::ApplyLanguage()
 	m_logLabel.SetWindowTextW(Tr(TextId::OperationLog));
 	if (!m_busy) m_statusLabel.SetWindowTextW(Tr(TextId::Ready));
 	const TextId columns[] = { TextId::ColumnDevice, TextId::ColumnCategory, TextId::ColumnProvider,
-		TextId::ColumnVersionDate, TextId::ColumnPackage, TextId::ColumnStatus };
+		TextId::ColumnVersion, TextId::ColumnDate, TextId::ColumnStatus };
 	for (int index = 0; index < _countof(columns); ++index)
 	{
 		LVCOLUMNW column = {};

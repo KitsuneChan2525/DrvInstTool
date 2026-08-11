@@ -24,8 +24,8 @@ namespace
 		{ L"Device", L"设备", L"裝置" },
 		{ L"Category", L"类别", L"類別" },
 		{ L"Provider", L"提供商", L"提供者" },
-		{ L"Version / date", L"版本 / 日期", L"版本 / 日期" },
-		{ L"Package", L"驱动包", L"驅動程式套件" },
+		{ L"Version", L"版本", L"版本" },
+		{ L"Date", L"日期", L"日期" },
 		{ L"Status", L"状态", L"狀態" },
 		{ L"Operation log", L"操作日志", L"操作記錄" },
 		{ L"Select the Data directory containing config.json", L"选择包含 config.json 的 Data 目录", L"選擇包含 config.json 的 Data 目錄" },
@@ -72,7 +72,8 @@ namespace
 		{ L"Unsupported OS or OSArch in config.json: ", L"config.json 中的 OS 或 OSArch 不受支持：", L"config.json 中的 OS 或 OSArch 不受支援：" },
 		{ L"Failed to detect the Windows version.", L"检测 Windows 版本失败。", L"偵測 Windows 版本失敗。" },
 		{ L"Unsupported system version", L"不支持的系统版本", L"不支援的系統版本" },
-		{ L"Use a compatible driver package before continuing driver installation.", L"请更换至兼容的驱动程序包后继续执行驱动程序安装", L"請更換為相容的驅動程式套件後再繼續執行驅動程式安裝" }
+		{ L"Use a compatible driver package before continuing driver installation.", L"请更换至兼容的驱动程序包后继续执行驱动程序安装", L"請更換為相容的驅動程式套件後再繼續執行驅動程式安裝" },
+		{ L"Startup failed: an unsupported operating system version was detected.", L"启动失败：检测到不支持的操作系统版本", L"啟動失敗：偵測到不支援的作業系統版本" }
 	};
 }
 

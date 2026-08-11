@@ -26,8 +26,8 @@ enum class TextId
 	ColumnDevice,
 	ColumnCategory,
 	ColumnProvider,
-	ColumnVersionDate,
-	ColumnPackage,
+	ColumnVersion,
+	ColumnDate,
 	ColumnStatus,
 	OperationLog,
 	BrowseTitle,
@@ -75,6 +75,7 @@ enum class TextId
 	VersionDetectionFailed,
 	UnsupportedSystemTitle,
 	UseCompatibleDriverPackage,
+	UnsupportedSystemLog,
 	Count
 };
 
