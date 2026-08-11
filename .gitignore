@@ -1,0 +1,29 @@
+# Visual Studio user state and caches
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+
+# Build outputs
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+Win32/
+obj/
+bin/
+*.pdb
+*.ilk
+*.ipch
+*.iobj
+*.ipdb
+
+# Local verification and rollback artifacts
+_codex_artifacts/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+*.swp
+*~
