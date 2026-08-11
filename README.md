@@ -1,8 +1,8 @@
 # kitsune Driver Installer
 
-Windows Vista 及以上版本使用的 MFC 驱动安装程序。
-用于本人封装 Windows 系统时在部署过程中使用。
-程序主要由 Codex 设计。
+- Windows Vista 及以上版本使用的 MFC 驱动安装程序。
+- 用于本人封装 Windows 系统时在部署过程中使用。
+- 程序主要由 Codex 设计。
 
 ## 功能
 
