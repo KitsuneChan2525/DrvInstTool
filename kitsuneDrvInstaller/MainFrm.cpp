@@ -3,6 +3,7 @@
 #include "kitsuneDrvInstaller.h"
 #include "MainFrm.h"
 #include "Localization.h"
+#include "AppVersion.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -26,6 +27,12 @@ CMainFrame::~CMainFrame() = default;
 int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 {
 	if (CMDIFrameWndEx::OnCreate(createStruct) == -1) return -1;
+	static const UINT statusIndicators[] = { ID_SEPARATOR };
+	if (!m_statusBar.Create(this) ||
+		!m_statusBar.SetIndicators(statusIndicators, _countof(statusIndicators)))
+		return -1;
+	m_statusBar.SetPaneStyle(0, SBPS_STRETCH | SBPS_NOBORDERS);
+	RefreshVersionStatus();
 	// Keep the resource menu owned by MFC, but detach it while the frame is
 	// still hidden. This avoids both a first-frame flash and an invalid menu
 	// handle during later MDI updates/shutdown.
@@ -42,6 +49,19 @@ int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 		systemMenu->DeleteMenu(SC_MAXIMIZE, MF_BYCOMMAND);
 	}
 	return 0;
+}
+
+void CMainFrame::RefreshVersionStatus()
+{
+	CString text = L"kitsune Driver Installer ";
+	switch (Localization::GetLanguage())
+	{
+	case UiLanguage::ChineseSimplified: text += L"版本："; break;
+	case UiLanguage::ChineseTraditional: text += L"版本："; break;
+	default: text += L"Version: "; break;
+	}
+	text += APP_FILE_VERSION_WSTRING;
+	m_statusBar.SetPaneText(0, text);
 }
 
 void CMainFrame::OnUpdateFrameMenu(HMENU /*hMenuAlt*/)

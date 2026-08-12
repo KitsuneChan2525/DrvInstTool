@@ -10,6 +10,7 @@ public:
 	virtual void OnUpdateFrameMenu(HMENU hMenuAlt);
 	void CenterBeforeFirstShow();
 	void SetInstallationActive(bool active);
+	void RefreshVersionStatus();
 
 #ifdef _DEBUG
 	virtual void AssertValid() const;
@@ -21,6 +22,7 @@ protected:
 	bool m_fixedSizeActive = false;
 	bool m_installationActive = false;
 	CSize m_fixedWindowSize;
+	CMFCStatusBar m_statusBar;
 	afx_msg int OnCreate(LPCREATESTRUCT createStruct);
 	afx_msg void OnShowWindow(BOOL show, UINT status);
 	afx_msg void OnSysCommand(UINT id, LPARAM parameter);

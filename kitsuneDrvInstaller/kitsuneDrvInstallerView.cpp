@@ -501,6 +501,8 @@ void CkitsuneDrvInstallerView::OnInstall()
 void CkitsuneDrvInstallerView::ApplyLanguage()
 {
 	UpdateTitle();
+	if (CMainFrame* mainFrame = DYNAMIC_DOWNCAST(CMainFrame, AfxGetMainWnd()))
+		mainFrame->RefreshVersionStatus();
 	m_languageLabel.SetWindowTextW(Tr(TextId::Language));
 	m_scan.SetWindowTextW(Tr(TextId::ScanHardware));
 	m_selectRecommended.SetWindowTextW(Tr(TextId::SelectMissing));
