@@ -54,6 +54,7 @@ protected:
 	afx_msg void OnSelectRecommended();
 	afx_msg void OnInstall();
 	afx_msg void OnLanguageChanged();
+	afx_msg LRESULT OnAutoScan(WPARAM wParam, LPARAM lParam);
 	DECLARE_MESSAGE_MAP()
 };
 

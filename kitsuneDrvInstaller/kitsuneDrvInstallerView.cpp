@@ -23,6 +23,7 @@ namespace
 		IDC_LOG = 2008
 		, IDC_LANGUAGE = 2009
 	};
+	constexpr UINT WM_AUTO_SCAN = WM_APP + 1;
 
 	bool FileExists(const std::wstring& path)
 	{
@@ -82,6 +83,7 @@ BEGIN_MESSAGE_MAP(CkitsuneDrvInstallerView, CView)
 	ON_BN_CLICKED(IDC_SELECT_RECOMMENDED, &CkitsuneDrvInstallerView::OnSelectRecommended)
 	ON_BN_CLICKED(IDC_INSTALL, &CkitsuneDrvInstallerView::OnInstall)
 	ON_CBN_SELCHANGE(IDC_LANGUAGE, &CkitsuneDrvInstallerView::OnLanguageChanged)
+	ON_MESSAGE(WM_AUTO_SCAN, &CkitsuneDrvInstallerView::OnAutoScan)
 END_MESSAGE_MAP()
 
 CkitsuneDrvInstallerView::CkitsuneDrvInstallerView() noexcept {}
@@ -136,6 +138,14 @@ void CkitsuneDrvInstallerView::OnInitialUpdate()
 	if (m_language.GetCount() != 3 || m_language.GetCurSel() == CB_ERR)
 		InitializeLanguageSelector();
 	UpdateTitle();
+	if (FileExists(JoinPath(CurrentDataRoot(), L"config.json")))
+		PostMessageW(WM_AUTO_SCAN);
+}
+
+LRESULT CkitsuneDrvInstallerView::OnAutoScan(WPARAM, LPARAM)
+{
+	OnScan();
+	return 0;
 }
 
 void CkitsuneDrvInstallerView::OnDraw(CDC*) {}
@@ -373,7 +383,6 @@ void CkitsuneDrvInstallerView::OnInstall()
 		AfxMessageBox(Tr(TextId::SevenZipMediaMissing), MB_ICONERROR);
 		return;
 	}
-	AppendLog(std::wstring(Tr(TextId::UsingExtractor)) + sevenZip);
 	SetBusy(true);
 	m_progress.SetRange32(0, static_cast<int>(selected.size()));
 	m_progress.SetPos(0);

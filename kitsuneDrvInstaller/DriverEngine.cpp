@@ -1196,7 +1196,7 @@ bool DriverInstaller::Install(const std::wstring& dataRoot, const DeviceMatch& m
 	{
 		const size_t slash = match.driver.infPath.find_last_of(L"\\/");
 		const std::wstring pattern = slash == std::wstring::npos ? L"*" : match.driver.infPath.substr(0, slash) + L"\\*";
-		if (log) log(std::wstring(Tr(TextId::Extracting)) + match.driver.archiveFile + L" / " + pattern);
+		if (log) log(std::wstring(Tr(TextId::Extracting)) + match.driver.archiveFile + L" -> " + pattern);
 		const std::wstring command = Quote(sevenZip) + L" x -y -aoa -bd " + Quote(L"-o" + cache) + L" " + Quote(archive) + L" " + Quote(pattern);
 		DWORD exitCode = 0;
 		if (!RunProcess(command, exitCode, error))
