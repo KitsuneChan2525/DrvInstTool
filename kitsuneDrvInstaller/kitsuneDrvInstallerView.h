@@ -31,6 +31,7 @@ protected:
 	CButton m_install;
 	CListCtrl m_devices;
 	CProgressCtrl m_progress;
+	CFont m_uiFont;
 	CFont m_titleFont;
 	CBrush m_backgroundBrush;
 	DriverCatalog m_catalog;

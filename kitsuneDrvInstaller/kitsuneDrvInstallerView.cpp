@@ -101,32 +101,57 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 	if (CView::OnCreate(createStruct) == -1) return -1;
 	if (!m_backgroundBrush.CreateSolidBrush(ViewBackgroundColor)) return -1;
 
-	m_titleFont.CreateFontW(-28, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, 0, DEFAULT_CHARSET,
-		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei UI");
+	NONCLIENTMETRICSW metrics = {};
+	metrics.cbSize = sizeof(metrics);
+	LOGFONTW uiLogFont = {};
+	if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof(metrics), &metrics, 0))
+		uiLogFont = metrics.lfMessageFont;
+	else
+	{
+		uiLogFont.lfHeight = -12;
+		uiLogFont.lfCharSet = DEFAULT_CHARSET;
+		uiLogFont.lfQuality = CLEARTYPE_QUALITY;
+		wcscpy_s(uiLogFont.lfFaceName, L"Segoe UI");
+	}
+	uiLogFont.lfQuality = CLEARTYPE_QUALITY;
+	if (!m_uiFont.CreateFontIndirectW(&uiLogFont)) return -1;
+	LOGFONTW titleLogFont = uiLogFont;
+	CClientDC viewDc(this);
+	titleLogFont.lfHeight = -MulDiv(18, viewDc.GetDeviceCaps(LOGPIXELSY), 72);
+	titleLogFont.lfWeight = FW_SEMIBOLD;
+	if (!m_titleFont.CreateFontIndirectW(&titleLogFont)) return -1;
 	Localization::SetLanguage(Localization::DetectSystemLanguage());
 	m_title.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
 	m_title.SetFont(&m_titleFont);
 	m_languageLabel.Create(L"", WS_CHILD | WS_VISIBLE | SS_RIGHT, CRect(), this);
+	m_languageLabel.SetFont(&m_uiFont);
 	if (!m_language.Create(WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST |
 		CBS_HASSTRINGS | CBS_NOINTEGRALHEIGHT | WS_VSCROLL, CRect(0, 0, 180, 240), this, IDC_LANGUAGE))
 		return -1;
-	m_language.SetFont(CFont::FromHandle(static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT))), FALSE);
+	m_language.SetFont(&m_uiFont);
 	if (!InitializeLanguageSelector()) return -1;
 	m_scan.Create(L"", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, CRect(), this, IDC_SCAN);
 	m_selectRecommended.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_SELECT_RECOMMENDED);
 	m_install.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_INSTALL);
+	m_scan.SetFont(&m_uiFont);
+	m_selectRecommended.SetFont(&m_uiFont);
+	m_install.SetFont(&m_uiFont);
 	m_install.EnableWindow(FALSE);
 	m_devices.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | LVS_REPORT | LVS_SHOWSELALWAYS, CRect(), this, IDC_DEVICE_LIST);
+	m_devices.SetFont(&m_uiFont);
 	m_devices.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER | LVS_EX_CHECKBOXES);
 	m_devices.InsertColumn(0, L"", LVCFMT_LEFT, 335);
 	m_devices.InsertColumn(1, L"", LVCFMT_LEFT, 210);
 	m_devices.InsertColumn(2, L"", LVCFMT_LEFT, 165);
 	m_devices.InsertColumn(3, L"", LVCFMT_LEFT, 155);
 	m_devices.InsertColumn(4, L"", LVCFMT_LEFT, 135);
+	if (m_devices.GetHeaderCtrl()) m_devices.GetHeaderCtrl()->SetFont(&m_uiFont);
 	m_progress.Create(WS_CHILD | WS_VISIBLE | PBS_SMOOTH, CRect(), this, IDC_PROGRESS);
 	m_logLabel.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
+	m_logLabel.SetFont(&m_uiFont);
 	m_log.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL,
 		CRect(), this, IDC_LOG);
+	m_log.SetFont(&m_uiFont);
 	ApplyLanguage();
 	CRect clientRect;
 	GetClientRect(&clientRect);
