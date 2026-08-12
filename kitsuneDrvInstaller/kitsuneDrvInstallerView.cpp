@@ -13,7 +13,6 @@ namespace
 {
 	enum ControlId
 	{
-		IDC_DATA_ROOT = 2001,
 		IDC_SCAN = 2003,
 		IDC_SELECT_RECOMMENDED = 2004,
 		IDC_INSTALL = 2005,
@@ -98,8 +97,6 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 	m_language.AddString(L"简体中文");
 	m_language.AddString(L"繁體中文");
 	m_language.SetCurSel(static_cast<int>(Localization::GetLanguage()));
-	m_dataLabel.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
-	m_dataRoot.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_READONLY, CRect(), this, IDC_DATA_ROOT);
 	m_scan.Create(L"", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, CRect(), this, IDC_SCAN);
 	m_listLabel.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
 	m_selectRecommended.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_SELECT_RECOMMENDED);
@@ -125,7 +122,6 @@ void CkitsuneDrvInstallerView::OnInitialUpdate()
 {
 	CView::OnInitialUpdate();
 	const std::wstring dataRoot = ProgramDataRoot();
-	m_dataRoot.SetWindowTextW(dataRoot.c_str());
 	UpdateTitle();
 	std::wstring compatibilityError;
 	if (FileExists(JoinPath(dataRoot, L"config.json")) &&
@@ -159,14 +155,12 @@ void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 	m_title.MoveWindow(margin, 16, contentWidth, 34);
 	m_languageLabel.MoveWindow(width - margin - 270, 20, 90, 24);
 	m_language.MoveWindow(width - margin - 172, 17, 172, 220);
-	m_dataLabel.MoveWindow(margin, 58, 95, 24);
 	m_scan.MoveWindow(width - margin - 105, 54, 105, 30);
-	m_dataRoot.MoveWindow(margin + 100, 55, max(80, width - margin * 2 - 100 - 105 - 8), 28);
 
-	m_listLabel.MoveWindow(margin, 98, 190, 24);
+	m_listLabel.MoveWindow(margin, 62, 190, 24);
 	m_install.MoveWindow(width - margin - 125, 92, 125, 31);
 	m_selectRecommended.MoveWindow(width - margin - 125 - 132, 92, 124, 31);
-	m_statusLabel.MoveWindow(margin + 200, 98, max(50, width - margin * 2 - 470), 23);
+	m_statusLabel.MoveWindow(margin + 200, 62, max(50, width - margin * 2 - 470), 23);
 
 	const int logHeight = 98;
 	const int bottomArea = 32 + 22 + logHeight + margin;
@@ -341,7 +335,6 @@ void CkitsuneDrvInstallerView::ApplyLanguage()
 {
 	UpdateTitle();
 	m_languageLabel.SetWindowTextW(Tr(TextId::Language));
-	m_dataLabel.SetWindowTextW(Tr(TextId::DataDirectory));
 	m_scan.SetWindowTextW(Tr(TextId::ScanHardware));
 	m_listLabel.SetWindowTextW(Tr(TextId::MatchedDevices));
 	m_selectRecommended.SetWindowTextW(Tr(TextId::SelectMissing));
