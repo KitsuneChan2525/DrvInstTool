@@ -32,6 +32,14 @@ struct DeviceMatch
 	bool updateAvailable = false;
 };
 
+struct DriverMatchContext
+{
+	std::wstring currentProvider;
+	std::wstring currentDeviceClass;
+	std::wstring currentInfName;
+	bool compatibleIds = false;
+};
+
 class DriverCatalog
 {
 public:
@@ -39,11 +47,15 @@ public:
 	{
 		std::wstring driverId;
 		std::wstring deviceName;
+		std::vector<std::wstring> candidateDriverIds;
+		bool requiresParentBluetoothStackContext = false;
 	};
 
 	bool Load(const std::wstring& dataRoot, std::wstring& error);
-	bool Match(const std::vector<std::wstring>& hardwareIds, DriverPackage& driver,
+	bool Match(const std::vector<std::wstring>& hardwareIds, const DriverMatchContext& context,
+		DriverPackage& driver,
 		std::wstring& matchedHardwareId, std::wstring& indexedDeviceName) const;
+	static bool RunMatchingTests(std::wstring& error);
 	size_t DriverCount() const { return m_drivers.size(); }
 	size_t HardwareIdCount() const { return m_hardwareIds.size(); }
 

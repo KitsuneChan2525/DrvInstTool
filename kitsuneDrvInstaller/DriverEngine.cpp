@@ -123,6 +123,24 @@ namespace
 			return false;
 		}
 
+		bool ParseBoolean(bool& output)
+		{
+			SkipSpace();
+			if (m_end - m_current >= 4 && strncmp(m_current, "true", 4) == 0)
+			{
+				m_current += 4;
+				output = true;
+				return true;
+			}
+			if (m_end - m_current >= 5 && strncmp(m_current, "false", 5) == 0)
+			{
+				m_current += 5;
+				output = false;
+				return true;
+			}
+			return false;
+		}
+
 		bool SkipValue()
 		{
 			SkipSpace();
@@ -331,7 +349,21 @@ namespace
 		}
 	}
 
-	bool ParseHardwareRoute(JsonReader& reader, std::wstring& driverId, std::wstring& deviceName)
+	bool ParseStringArray(JsonReader& reader, std::vector<std::wstring>& values)
+	{
+		if (!reader.Consume('[')) return false;
+		if (reader.Consume(']')) return true;
+		for (;;)
+		{
+			std::wstring value;
+			if (!ParseStringField(reader, value)) return false;
+			values.push_back(value);
+			if (reader.Consume(']')) return true;
+			if (!reader.Consume(',')) return false;
+		}
+	}
+
+	bool ParseHardwareRoute(JsonReader& reader, DriverCatalog::HardwareRoute& route)
 	{
 		if (!reader.Consume('{')) return false;
 		if (reader.Consume('}')) return true;
@@ -341,17 +373,40 @@ namespace
 			if (!reader.ParseString(key) || !reader.Consume(':')) return false;
 			if (key == "selected_driver_id")
 			{
-				if (!ParseStringField(reader, driverId)) return false;
+				if (!ParseStringField(reader, route.driverId)) return false;
+			}
+			else if (key == "candidate_driver_ids")
+			{
+				if (!ParseStringArray(reader, route.candidateDriverIds)) return false;
 			}
 			else if (key == "device_names")
 			{
 				if (!reader.Consume('[')) return false;
 				if (!reader.Consume(']'))
 				{
-					if (!ParseStringField(reader, deviceName)) return false;
+					if (!ParseStringField(reader, route.deviceName)) return false;
 					while (!reader.Consume(']'))
 					{
 						if (!reader.Consume(',') || !reader.SkipValue()) return false;
+					}
+				}
+			}
+			else if (key == "selection")
+			{
+				if (!reader.Consume('{')) return false;
+				if (!reader.Consume('}'))
+				{
+					for (;;)
+					{
+						std::string selectionKey;
+						if (!reader.ParseString(selectionKey) || !reader.Consume(':')) return false;
+						if (selectionKey == "requires_parent_bluetooth_stack_context")
+						{
+							if (!reader.ParseBoolean(route.requiresParentBluetoothStackContext)) return false;
+						}
+						else if (!reader.SkipValue()) return false;
+						if (reader.Consume('}')) break;
+						if (!reader.Consume(',')) return false;
 					}
 				}
 			}
@@ -400,9 +455,9 @@ namespace
 					for (;;)
 					{
 						std::string hardwareId;
-						std::wstring driverId, deviceName;
-						if (!reader.ParseString(hardwareId) || !reader.Consume(':') || !ParseHardwareRoute(reader, driverId, deviceName)) return false;
-						if (!driverId.empty()) routes[Upper(Utf8ToWide(hardwareId))] = { driverId, deviceName };
+						DriverCatalog::HardwareRoute route;
+						if (!reader.ParseString(hardwareId) || !reader.Consume(':') || !ParseHardwareRoute(reader, route)) return false;
+						if (!route.driverId.empty()) routes[Upper(Utf8ToWide(hardwareId))] = route;
 						if (reader.Consume('}')) break;
 						if (!reader.Consume(',')) return false;
 					}
@@ -453,6 +508,35 @@ namespace
 			current += wcslen(current) + 1;
 		}
 		return result;
+	}
+
+	std::wstring FileNamePart(const std::wstring& path)
+	{
+		const size_t slash = path.find_last_of(L"\\/");
+		return Upper(slash == std::wstring::npos ? path : path.substr(slash + 1));
+	}
+
+	bool SameText(const std::wstring& left, const std::wstring& right)
+	{
+		return !left.empty() && !right.empty() && _wcsicmp(left.c_str(), right.c_str()) == 0;
+	}
+
+	bool IsVendorSpecificCompatibleId(const std::wstring& hardwareId)
+	{
+		const std::wstring value = Upper(hardwareId);
+		return value.find(L"VEN_") != std::wstring::npos ||
+			value.find(L"VID_") != std::wstring::npos ||
+			value.find(L"DEV_") != std::wstring::npos ||
+			value.find(L"PID_") != std::wstring::npos ||
+			value.find(L"SUBSYS_") != std::wstring::npos;
+	}
+
+	bool IsGenericHardwareId(const std::wstring& hardwareId)
+	{
+		const std::wstring value = Upper(hardwareId);
+		return value.find(L"HID_DEVICE_") == 0 ||
+			value.find(L"USB\\CLASS_") == 0 ||
+			value.find(L"PCI\\CC_") == 0;
 	}
 
 	std::wstring ReadDriverRegistryString(HDEVINFO set, SP_DEVINFO_DATA& device, const wchar_t* name)
@@ -833,21 +917,115 @@ bool DriverCatalog::Load(const std::wstring& dataRoot, std::wstring& error)
 	return true;
 }
 
-bool DriverCatalog::Match(const std::vector<std::wstring>& hardwareIds, DriverPackage& driver,
+bool DriverCatalog::Match(const std::vector<std::wstring>& hardwareIds,
+	const DriverMatchContext& context, DriverPackage& driver,
 	std::wstring& matchedHardwareId, std::wstring& indexedDeviceName) const
 {
 	for (const auto& hardwareId : hardwareIds)
 	{
+		if (context.compatibleIds && !IsVendorSpecificCompatibleId(hardwareId)) continue;
 		auto route = m_hardwareIds.find(Upper(hardwareId));
 		if (route == m_hardwareIds.end()) continue;
-		auto package = m_drivers.find(route->second.driverId);
+		std::wstring selectedDriverId = route->second.driverId;
+		if (route->second.requiresParentBluetoothStackContext)
+		{
+			if (context.compatibleIds) continue;
+			selectedDriverId.clear();
+			for (const auto& candidateId : route->second.candidateDriverIds)
+			{
+				auto candidate = m_drivers.find(candidateId);
+				if (candidate == m_drivers.end()) continue;
+				if (SameText(candidate->second.provider, context.currentProvider) &&
+					SameText(candidate->second.deviceClass, context.currentDeviceClass))
+				{
+					selectedDriverId = candidateId;
+					break;
+				}
+				if (SameText(FileNamePart(candidate->second.infPath), context.currentInfName))
+				{
+					selectedDriverId = candidateId;
+					break;
+				}
+			}
+			if (selectedDriverId.empty()) continue;
+		}
+		auto package = m_drivers.find(selectedDriverId);
 		if (package == m_drivers.end()) continue;
+		if (IsGenericHardwareId(hardwareId) &&
+			!SameText(package->second.provider, context.currentProvider)) continue;
+		if (context.compatibleIds && !context.currentDeviceClass.empty() &&
+			!SameText(package->second.deviceClass, context.currentDeviceClass)) continue;
 		driver = package->second;
 		matchedHardwareId = hardwareId;
 		indexedDeviceName = route->second.deviceName;
 		return true;
 	}
 	return false;
+}
+
+bool DriverCatalog::RunMatchingTests(std::wstring& error)
+{
+	DriverCatalog catalog;
+	DriverPackage intel;
+	intel.id = L"IntelAux";
+	intel.provider = L"Intel Corporation";
+	intel.deviceClass = L"BluetoothAuxiliary";
+	intel.infPath = L"Intel\\btmaux.inf";
+	DriverPackage microsoft;
+	microsoft.id = L"MicrosoftMedia";
+	microsoft.provider = L"Microsoft";
+	microsoft.deviceClass = L"MEDIA";
+	microsoft.infPath = L"microsoft_bluetooth_a2dp_snk.inf";
+	catalog.m_drivers[intel.id] = intel;
+	catalog.m_drivers[microsoft.id] = microsoft;
+	HardwareRoute contextual;
+	contextual.driverId = intel.id;
+	contextual.candidateDriverIds = { intel.id };
+	contextual.requiresParentBluetoothStackContext = true;
+	catalog.m_hardwareIds[L"BTHENUM\\{0000110A}"] = contextual;
+	HardwareRoute exact;
+	exact.driverId = microsoft.id;
+	catalog.m_hardwareIds[L"BTHENUM\\EXACT_XIAOMI"] = exact;
+	HardwareRoute generic;
+	generic.driverId = intel.id;
+	catalog.m_hardwareIds[L"HID_DEVICE_UP:FF00_U:0001"] = generic;
+	DriverPackage result;
+	std::wstring matched, name;
+	DriverMatchContext microsoftContext;
+	microsoftContext.currentProvider = L"Microsoft";
+	microsoftContext.currentDeviceClass = L"MEDIA";
+	microsoftContext.currentInfName = L"microsoft_bluetooth_a2dp_snk.inf";
+	microsoftContext.compatibleIds = true;
+	if (catalog.Match({ L"BTHENUM\\{0000110A}" }, microsoftContext, result, matched, name))
+	{
+		error = L"Ambiguous Bluetooth profile route was accepted without matching stack context";
+		return false;
+	}
+	microsoftContext.compatibleIds = false;
+	if (catalog.Match({ L"HID_DEVICE_UP:FF00_U:0001" }, microsoftContext, result, matched, name))
+	{
+		error = L"Generic HID hardware ID was accepted for a different provider";
+		return false;
+	}
+	if (!catalog.Match({ L"BTHENUM\\EXACT_XIAOMI" }, microsoftContext, result, matched, name) ||
+		result.id != microsoft.id)
+	{
+		error = L"Exact hardware ID route did not match";
+		return false;
+	}
+	DriverMatchContext intelContext;
+	intelContext.currentProvider = L"Intel Corporation";
+	intelContext.currentDeviceClass = L"BluetoothAuxiliary";
+	intelContext.currentInfName = L"btmaux.inf";
+	intelContext.compatibleIds = false;
+	if (!catalog.Match({ L"BTHENUM\\{0000110A}" }, intelContext, result, matched, name) ||
+		result.id != intel.id)
+	{
+		error = L"Bluetooth profile route did not honor matching stack context";
+		return false;
+	}
+	error.clear();
+	return true;
 }
 
 bool DeviceScanner::Scan(const DriverCatalog& catalog, std::vector<DeviceMatch>& matches,
@@ -873,12 +1051,17 @@ bool DeviceScanner::Scan(const DriverCatalog& catalog, std::vector<DeviceMatch>&
 		++scannedDeviceCount;
 		std::vector<std::wstring> ids = GetMultiString(set, device, SPDRP_HARDWAREID);
 		if (ids.empty()) continue;
+		DriverMatchContext matchContext;
+		matchContext.currentProvider = GetDeviceText(set, device, SPDRP_MFG);
+		matchContext.currentDeviceClass = GetDeviceText(set, device, SPDRP_CLASS);
+		matchContext.currentInfName = ReadDriverRegistryString(set, device, L"InfPath");
 		DriverPackage package;
 		std::wstring matchedId, indexedName;
-		if (!catalog.Match(ids, package, matchedId, indexedName))
+		if (!catalog.Match(ids, matchContext, package, matchedId, indexedName))
 		{
 			std::vector<std::wstring> compatible = GetMultiString(set, device, SPDRP_COMPATIBLEIDS);
-			if (!catalog.Match(compatible, package, matchedId, indexedName)) continue;
+			matchContext.compatibleIds = true;
+			if (!catalog.Match(compatible, matchContext, package, matchedId, indexedName)) continue;
 		}
 		DeviceMatch match;
 		wchar_t instanceId[4096] = {};

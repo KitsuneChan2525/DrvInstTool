@@ -102,6 +102,8 @@ namespace
 		const bool compatibilityRulesOk = SystemCompatibility::RunRuleTests(compatibilityError);
 		std::wstring driverVersionError;
 		const bool driverVersionRulesOk = DeviceScanner::RunVersionComparisonTests(driverVersionError);
+		std::wstring driverMatchingError;
+		const bool driverMatchingRulesOk = DriverCatalog::RunMatchingTests(driverMatchingError);
 		std::wstring mediaCompatibilityError;
 		const bool mediaCompatibilityOk = SystemCompatibility::ValidateDriverMedia(dataRoot, mediaCompatibilityError);
 		std::wstring mediaTargetSystem;
@@ -120,6 +122,14 @@ namespace
 			else if (match.updateAvailable) ++updateDrivers;
 			else ++installedDrivers;
 		}
+		size_t ambiguousBluetoothProfileMatches = 0;
+		for (const auto& match : matches)
+		{
+			const std::wstring hardwareId = match.hardwareId;
+			if (hardwareId.size() >= 9 && _wcsnicmp(hardwareId.c_str(), L"BTHENUM\\{", 9) == 0 &&
+				_wcsicmp(match.driver.deviceClass.c_str(), L"BluetoothAuxiliary") == 0)
+				++ambiguousBluetoothProfileMatches;
+		}
 		const std::wstring sevenZip = DriverInstaller::Find7Zip(dataRoot);
 		std::ofstream report(reportPath, std::ios::binary | std::ios::trunc);
 		report << "{\n"
@@ -127,6 +137,8 @@ namespace
 			<< "  \"compatibility_error\": \"" << JsonEscapeUtf8(compatibilityError) << "\",\n"
 			<< "  \"driver_version_rules_ok\": " << (driverVersionRulesOk ? "true" : "false") << ",\n"
 			<< "  \"driver_version_error\": \"" << JsonEscapeUtf8(driverVersionError) << "\",\n"
+			<< "  \"driver_matching_rules_ok\": " << (driverMatchingRulesOk ? "true" : "false") << ",\n"
+			<< "  \"driver_matching_error\": \"" << JsonEscapeUtf8(driverMatchingError) << "\",\n"
 			<< "  \"media_compatibility_ok\": " << (mediaCompatibilityOk ? "true" : "false") << ",\n"
 			<< "  \"media_compatibility_error\": \"" << JsonEscapeUtf8(mediaCompatibilityError) << "\",\n"
 			<< "  \"media_target_ok\": " << (mediaTargetOk ? "true" : "false") << ",\n"
@@ -141,6 +153,19 @@ namespace
 			<< "  \"missing_driver_count\": " << missingDrivers << ",\n"
 			<< "  \"update_driver_count\": " << updateDrivers << ",\n"
 			<< "  \"installed_driver_count\": " << installedDrivers << ",\n"
+			<< "  \"ambiguous_bluetooth_profile_match_count\": " << ambiguousBluetoothProfileMatches << ",\n"
+			<< "  \"matches\": [\n";
+		for (size_t index = 0; index < matches.size(); ++index)
+		{
+			const auto& match = matches[index];
+			report << "    {\"device\": \"" << JsonEscapeUtf8(match.displayName)
+				<< "\", \"hardware_id\": \"" << JsonEscapeUtf8(match.hardwareId)
+				<< "\", \"driver_id\": \"" << JsonEscapeUtf8(match.driver.id)
+				<< "\", \"provider\": \"" << JsonEscapeUtf8(match.driver.provider)
+				<< "\", \"device_class\": \"" << JsonEscapeUtf8(match.driver.deviceClass)
+				<< "\"}" << (index + 1 < matches.size() ? "," : "") << "\n";
+		}
+		report << "  ],\n"
 			<< "  \"seven_zip\": \"" << JsonEscapeUtf8(sevenZip) << "\",\n"
 			<< "  \"error\": \"" << JsonEscapeUtf8(error) << "\"\n"
 			<< "}\n";
