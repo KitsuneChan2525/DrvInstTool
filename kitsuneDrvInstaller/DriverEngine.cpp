@@ -606,13 +606,17 @@ namespace
 	bool IsPackageNewer(const DriverPackage& package, const std::wstring& installedVersion,
 		const std::wstring& installedDate)
 	{
+		const unsigned long long packageDate = DateKey(package.driverDate);
+		const unsigned long long currentDate = DateKey(installedDate);
+		// A later installed-driver date represents a newer OEM release line even
+		// when its vendor-specific version sequence is numerically lower.
+		if (packageDate != 0 && currentDate != 0 && currentDate > packageDate)
+			return false;
 		if (!package.driverVersion.empty() && !installedVersion.empty())
 		{
 			const int versionOrder = CompareNumericParts(package.driverVersion, installedVersion);
 			if (versionOrder != 0) return versionOrder > 0;
 		}
-		const unsigned long long packageDate = DateKey(package.driverDate);
-		const unsigned long long currentDate = DateKey(installedDate);
 		return packageDate != 0 && currentDate != 0 && packageDate > currentDate;
 	}
 
@@ -1120,6 +1124,7 @@ bool DeviceScanner::RunVersionComparisonTests(std::wstring& error)
 	{
 		{ L"1.2.0.34", L"1.2.0.33", L"01/01/2020", L"01/01/2020", true },
 		{ L"1.2.001.0402", L"1.2.1.402", L"03/29/2015", L"03/28/2015", true },
+		{ L"2.2.2.1045", L"2.1.101.10734", L"07/19/2013", L"09/17/2025", false },
 		{ L"8.782.0.0000", L"8.782.0.0", L"09/28/2010", L"09/28/2010", false },
 		{ L"2.0.0.0", L"3.0.0.0", L"12/31/2030", L"01/01/2020", false },
 		{ L"", L"", L"04/18/2020", L"04/17/2020", true }
@@ -1171,16 +1176,16 @@ bool DriverInstaller::Install(const std::wstring& dataRoot, const DeviceMatch& m
 		error = std::wstring(Tr(TextId::ArchiveMissing)) + archive;
 		return false;
 	}
-	wchar_t commonData[MAX_PATH] = {};
-	if (FAILED(SHGetFolderPathW(nullptr, CSIDL_COMMON_APPDATA, nullptr, SHGFP_TYPE_CURRENT, commonData)))
-	{
-		error = Tr(TextId::ProgramDataFailed);
-		return false;
-	}
 	std::wstring archiveBase = match.driver.archiveFile;
 	const size_t extension = archiveBase.find_last_of(L'.');
 	if (extension != std::wstring::npos) archiveBase.resize(extension);
-	const std::wstring cache = JoinPath(JoinPath(JoinPath(commonData, L"kitsuneDriverInstaller"), L"Cache"), match.driver.packageDirectory + L"\\" + archiveBase);
+	wchar_t windowsDirectory[MAX_PATH] = {};
+	const std::wstring systemDriversRoot = GetWindowsDirectoryW(windowsDirectory,
+		_countof(windowsDirectory)) == 0
+		? L"C:\\Drivers"
+		: JoinPath(ParentDirectory(windowsDirectory), L"Drivers");
+	const std::wstring cache = JoinPath(JoinPath(systemDriversRoot, L"Extracted"),
+		match.driver.packageDirectory + L"\\" + archiveBase);
 	if (!EnsureDirectory(cache))
 	{
 		error = std::wstring(Tr(TextId::CacheCreateFailed)) + cache;
@@ -1210,7 +1215,12 @@ bool DriverInstaller::Install(const std::wstring& dataRoot, const DeviceMatch& m
 		error = std::wstring(Tr(TextId::InfMissing)) + inf;
 		return false;
 	}
-	if (log) log(std::wstring(Tr(TextId::InstallingInf)) + match.driver.id + L": " + inf);
+	const size_t infSlash = match.driver.infPath.find_last_of(L"\\/");
+	const std::wstring infFileName = infSlash == std::wstring::npos
+		? match.driver.infPath
+		: match.driver.infPath.substr(infSlash + 1);
+	if (log) log(std::wstring(Tr(TextId::InstallingInf)) + match.displayName + L" [" +
+		infFileName + L"]");
 	using UpdateDriverFn = BOOL(WINAPI*)(HWND, LPCWSTR, LPCWSTR, DWORD, PBOOL);
 	HMODULE newDev = LoadLibraryW(L"newdev.dll");
 	if (!newDev)

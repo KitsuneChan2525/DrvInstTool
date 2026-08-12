@@ -47,6 +47,14 @@ namespace
 		return JoinPath(ParentDirectory(module), L"Data");
 	}
 
+	std::wstring SystemDriversRoot()
+	{
+		wchar_t windowsDirectory[MAX_PATH] = {};
+		if (GetWindowsDirectoryW(windowsDirectory, _countof(windowsDirectory)) == 0)
+			return L"C:\\Drivers";
+		return JoinPath(ParentDirectory(windowsDirectory), L"Drivers");
+	}
+
 	void PumpMessages()
 	{
 		MSG message;
@@ -238,6 +246,25 @@ void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
 	m_log.SetWindowTextW(existing);
 	m_log.SetSel(-1, -1);
 	m_log.SendMessageW(EM_SCROLLCARET, 0, 0);
+	const std::wstring logDirectory = SystemDriversRoot();
+	CreateDirectoryW(logDirectory.c_str(), nullptr);
+	const std::wstring logPath = JoinPath(logDirectory, L"Install.log");
+	const HANDLE logFile = CreateFileW(logPath.c_str(), FILE_APPEND_DATA,
+		FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (logFile != INVALID_HANDLE_VALUE)
+	{
+		const int byteCount = WideCharToMultiByte(CP_UTF8, 0, line.GetString(), line.GetLength(),
+			nullptr, 0, nullptr, nullptr);
+		if (byteCount > 0)
+		{
+			std::string utf8(static_cast<size_t>(byteCount), '\0');
+			WideCharToMultiByte(CP_UTF8, 0, line.GetString(), line.GetLength(), &utf8[0],
+				byteCount, nullptr, nullptr);
+			DWORD written = 0;
+			WriteFile(logFile, utf8.data(), static_cast<DWORD>(utf8.size()), &written, nullptr);
+		}
+		CloseHandle(logFile);
+	}
 	PumpMessages();
 }
 
@@ -269,7 +296,7 @@ void CkitsuneDrvInstallerView::OnScan()
 	SetBusy(true);
 	m_progress.SetRange32(0, 100);
 	m_progress.SetPos(12);
-	AppendLog(std::wstring(Tr(TextId::LoadingIndex)) + L" " + root);
+	AppendLog(Tr(TextId::LoadingIndex));
 	if (!m_catalog.Load(root, error))
 	{
 		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + error);
@@ -290,7 +317,7 @@ void CkitsuneDrvInstallerView::OnScan()
 	RefreshDeviceList();
 	CString summary;
 	summary.Format(Tr(TextId::ScanSummaryFormat),
-		scanned, static_cast<unsigned>(m_matches.size()), static_cast<unsigned>(m_catalog.DriverCount()), static_cast<unsigned>(m_catalog.HardwareIdCount()));
+		scanned, static_cast<unsigned>(m_matches.size()));
 	AppendLog(summary.GetString());
 	SetBusy(false);
 }
@@ -351,18 +378,16 @@ void CkitsuneDrvInstallerView::OnInstall()
 	m_progress.SetRange32(0, static_cast<int>(selected.size()));
 	m_progress.SetPos(0);
 	int success = 0;
-	bool anyReboot = false;
 	for (size_t position = 0; position < selected.size(); ++position)
 	{
 		const int row = selected[position];
 		DeviceMatch& match = m_matches[static_cast<size_t>(row)];
-		AppendLog(std::wstring(Tr(TextId::StartInstall)) + match.displayName + L" [" + match.driver.id + L"]");
+		AppendLog(std::wstring(Tr(TextId::StartInstall)) + match.displayName);
 		bool reboot = false;
 		std::wstring error;
 		if (DriverInstaller::Install(root, match, reboot, error, [this](const std::wstring& line) { AppendLog(line); }))
 		{
 			++success;
-			anyReboot = anyReboot || reboot;
 			m_devices.SetItemText(row, 4, reboot ? Tr(TextId::InstalledReboot) : Tr(TextId::InstalledSuccess));
 			m_devices.SetCheck(row, FALSE);
 			AppendLog(std::wstring(Tr(TextId::InstallSuccessLog)) + match.displayName);
@@ -375,11 +400,25 @@ void CkitsuneDrvInstallerView::OnInstall()
 		m_progress.SetPos(static_cast<int>(position + 1));
 		PumpMessages();
 	}
-	CString summary;
-	summary.Format(Tr(TextId::InstallSummaryFormat), success, static_cast<unsigned>(selected.size()), anyReboot ? Tr(TextId::RebootSuffix) : L"");
+	const int failed = static_cast<int>(selected.size()) - success;
+	CString successLine;
+	successLine.Format(Tr(TextId::InstallSuccessCountFormat), success);
+	CString summary = Tr(TextId::InstallCompleteHeading);
+	summary += L"\r\n";
+	summary += successLine;
+	if (failed > 0)
+	{
+		CString failureLine;
+		failureLine.Format(Tr(TextId::InstallFailureCountFormat), failed);
+		summary += L"\r\n";
+		summary += failureLine;
+	}
+	summary += L"\r\n";
+	summary += Tr(TextId::RestartToApply);
 	AppendLog(summary.GetString());
 	SetBusy(false);
-	AfxMessageBox(summary, success == static_cast<int>(selected.size()) ? MB_ICONINFORMATION : MB_ICONWARNING);
+	::MessageBoxW(GetSafeHwnd(), summary, Tr(TextId::InstallCompleteTitle),
+		MB_OK | (failed == 0 ? MB_ICONINFORMATION : MB_ICONWARNING));
 }
 
 void CkitsuneDrvInstallerView::ApplyLanguage()

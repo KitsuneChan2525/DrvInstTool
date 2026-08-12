@@ -31,7 +31,7 @@ namespace
 		{ L"Installed", L"已安装", L"已安裝" },
 		{ L"Installed - restart required", L"成功，需重启", L"成功，需重新啟動" },
 		{ L"Failed", L"安装失败", L"安裝失敗" },
-		{ L"Loading driver indexes...", L"正在加载驱动索引…", L"正在載入驅動程式索引…" },
+		{ L"Loading driver indexes...", L"正在加载驱动索引...", L"正在載入驅動程式索引..." },
 		{ L"Enumerating Plug and Play devices...", L"正在枚举即插即用设备…", L"正在列舉隨插即用裝置…" },
 		{ L"Index loading failed", L"索引加载失败", L"索引載入失敗" },
 		{ L"Device scan failed", L"设备扫描失败", L"裝置掃描失敗" },
@@ -44,7 +44,7 @@ namespace
 		{ L"Installed: ", L"安装成功：", L"安裝成功：" },
 		{ L"Failed: ", L"安装失败：", L"安裝失敗：" },
 		{ L", restart Windows", L"，请重启系统", L"，請重新啟動系統" },
-		{ L"Scanned %d devices; matched %u drivers (index: %u drivers / %u hardware IDs)", L"扫描 %d 个设备，匹配 %u 个驱动（索引：%u 个驱动 / %u 个硬件 ID）", L"掃描 %d 個裝置，比對 %u 個驅動程式（索引：%u 個驅動程式 / %u 個硬體 ID）" },
+		{ L"Scanned %d devices; matched %u drivers", L"已扫描 %d 个设备，匹配到 %u 个驱动", L"已掃描 %d 個裝置，比對到 %u 個驅動程式" },
 		{ L"Installation finished: %d of %u succeeded%s", L"安装结束：成功 %d / %u%s", L"安裝結束：成功 %d / %u%s" },
 		{ L"Invalid configuration or no driver packages: ", L"配置文件格式无效或没有驱动包：", L"設定檔格式無效或沒有驅動程式套件：" },
 		{ L"Failed to read driver index: ", L"驱动索引读取失败：", L"驅動程式索引讀取失敗：" },
@@ -70,7 +70,12 @@ namespace
 		{ L"Failed to detect the Windows version.", L"检测 Windows 版本失败。", L"偵測 Windows 版本失敗。" },
 		{ L"Unsupported system version", L"不支持的系统版本", L"不支援的系統版本" },
 		{ L"Use a compatible driver package before continuing driver installation.", L"请更换至兼容的驱动程序包后继续执行驱动程序安装", L"請更換為相容的驅動程式套件後再繼續執行驅動程式安裝" },
-		{ L"Operation failed: an unsupported operating system version was detected.", L"操作失败：检测到不支持的操作系统版本", L"操作失敗：偵測到不支援的作業系統版本" }
+		{ L"Operation failed: an unsupported operating system version was detected.", L"操作失败：检测到不支持的操作系统版本", L"操作失敗：偵測到不支援的作業系統版本" },
+		{ L"Installation completed", L"已完成安装", L"已完成安裝" },
+		{ L"Driver installation finished", L"驱动安装结束", L"驅動程式安裝結束" },
+		{ L"%d driver(s) installed successfully", L"%d 个驱动安装成功", L"%d 個驅動程式安裝成功" },
+		{ L"%d driver(s) failed to install", L"%d 个驱动安装失败", L"%d 個驅動程式安裝失敗" },
+		{ L"Restart Windows to apply the changes", L"请重新启动系统以使更改生效", L"請重新啟動系統以套用變更" }
 	};
 }
 

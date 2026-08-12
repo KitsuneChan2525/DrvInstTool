@@ -73,6 +73,11 @@ enum class TextId
 	UnsupportedSystemTitle,
 	UseCompatibleDriverPackage,
 	UnsupportedSystemLog,
+	InstallCompleteTitle,
+	InstallCompleteHeading,
+	InstallSuccessCountFormat,
+	InstallFailureCountFormat,
+	RestartToApply,
 	Count
 };
 
