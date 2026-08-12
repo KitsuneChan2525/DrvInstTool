@@ -44,7 +44,7 @@ namespace
 		{ L"Installed: ", L"安装成功：", L"安裝成功：" },
 		{ L"Failed: ", L"安装失败：", L"安裝失敗：" },
 		{ L", restart Windows", L"，请重启系统", L"，請重新啟動系統" },
-		{ L"Scanned %d devices; matched %u drivers", L"已扫描 %d 个设备，匹配到 %u 个驱动", L"已掃描 %d 個裝置，比對到 %u 個驅動程式" },
+		{ L"Scanned devices; matched %u drivers", L"已扫描设备，匹配到 %u 个驱动", L"已掃描裝置，比對到 %u 個驅動程式" },
 		{ L"Installation finished: %d of %u succeeded%s", L"安装结束：成功 %d / %u%s", L"安裝結束：成功 %d / %u%s" },
 		{ L"Invalid configuration or no driver packages: ", L"配置文件格式无效或没有驱动包：", L"設定檔格式無效或沒有驅動程式套件：" },
 		{ L"Failed to read driver index: ", L"驱动索引读取失败：", L"驅動程式索引讀取失敗：" },

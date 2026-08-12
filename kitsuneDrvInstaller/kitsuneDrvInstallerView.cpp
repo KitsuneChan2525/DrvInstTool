@@ -121,7 +121,7 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 	titleLogFont.lfWeight = FW_SEMIBOLD;
 	if (!m_titleFont.CreateFontIndirectW(&titleLogFont)) return -1;
 	Localization::SetLanguage(Localization::DetectSystemLanguage());
-	m_title.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
+	m_title.Create(L"", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE | SS_NOPREFIX, CRect(), this);
 	m_title.SetFont(&m_titleFont);
 	m_languageLabel.Create(L"", WS_CHILD | WS_VISIBLE | SS_RIGHT, CRect(), this);
 	m_languageLabel.SetFont(&m_uiFont);
@@ -207,6 +207,14 @@ void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 	const int margin = 22;
 	const int gap = 8;
 	const int contentWidth = max(300, width - margin * 2);
+	CClientDC dc(this);
+	CFont* previousFont = dc.SelectObject(&m_titleFont);
+	TEXTMETRICW titleMetrics = {};
+	dc.GetTextMetricsW(&titleMetrics);
+	dc.SelectObject(previousFont);
+	const int titleTop = 12;
+	const int titleHeight = max(36,
+		titleMetrics.tmHeight + titleMetrics.tmExternalLeading + 12);
 
 	// Header: keep the language selector at the upper-right and reserve the
 	// remaining width for the package title so the controls never overlap.
@@ -214,9 +222,9 @@ void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 	const int languageLabelWidth = 74;
 	const int languageX = width - margin - languageWidth;
 	const int languageLabelX = languageX - gap - languageLabelWidth;
-	m_title.MoveWindow(margin, 16, max(120, languageLabelX - margin - 14), 36);
-	m_languageLabel.MoveWindow(languageLabelX, 21, languageLabelWidth, 24);
-	m_language.SetWindowPos(nullptr, languageX, 17, languageWidth, 240,
+	m_title.MoveWindow(margin, titleTop, max(120, languageLabelX - margin - 14), titleHeight);
+	m_languageLabel.MoveWindow(languageLabelX, titleTop + 5, languageLabelWidth, 24);
+	m_language.SetWindowPos(nullptr, languageX, titleTop + 1, languageWidth, 240,
 		SWP_NOZORDER | SWP_SHOWWINDOW);
 
 	// All three actions share the row below the title.
@@ -226,13 +234,14 @@ void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 	const int installX = width - margin - installWidth;
 	const int selectX = installX - gap - selectWidth;
 	const int scanX = selectX - gap - scanWidth;
-	m_scan.MoveWindow(scanX, 62, scanWidth, 32);
-	m_selectRecommended.MoveWindow(selectX, 62, selectWidth, 32);
-	m_install.MoveWindow(installX, 62, installWidth, 32);
+	const int actionsTop = titleTop + titleHeight + gap;
+	m_scan.MoveWindow(scanX, actionsTop, scanWidth, 32);
+	m_selectRecommended.MoveWindow(selectX, actionsTop, selectWidth, 32);
+	m_install.MoveWindow(installX, actionsTop, installWidth, 32);
 
 	// The device list receives all flexible vertical space. Progress and log
 	// areas stay anchored to the bottom for a stable layout at every size.
-	const int devicesTop = 105;
+	const int devicesTop = actionsTop + 43;
 	const int logHeight = max(96, min(150, height / 5));
 	const int logTop = height - margin - logHeight;
 	const int logLabelY = logTop - 25;
@@ -278,7 +287,8 @@ void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
 	SYSTEMTIME now;
 	GetLocalTime(&now);
 	CString line;
-	line.Format(L"[%02u:%02u:%02u] %s\r\n", now.wHour, now.wMinute, now.wSecond, text.c_str());
+	line.Format(L"[%02u:%02u:%02u] %s", now.wHour, now.wMinute, now.wSecond, text.c_str());
+	if (!existing.IsEmpty()) existing += L"\r\n";
 	existing += line;
 	m_log.SetWindowTextW(existing);
 	m_log.SetSel(-1, -1);
@@ -292,12 +302,13 @@ void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
 		FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (logFile != INVALID_HANDLE_VALUE)
 	{
-		const int byteCount = WideCharToMultiByte(CP_UTF8, 0, line.GetString(), line.GetLength(),
+		CString fileLine = line + L"\r\n";
+		const int byteCount = WideCharToMultiByte(CP_UTF8, 0, fileLine.GetString(), fileLine.GetLength(),
 			nullptr, 0, nullptr, nullptr);
 		if (byteCount > 0)
 		{
 			std::string utf8(static_cast<size_t>(byteCount), '\0');
-			WideCharToMultiByte(CP_UTF8, 0, line.GetString(), line.GetLength(), &utf8[0],
+			WideCharToMultiByte(CP_UTF8, 0, fileLine.GetString(), fileLine.GetLength(), &utf8[0],
 				byteCount, nullptr, nullptr);
 			DWORD written = 0;
 			WriteFile(logFile, utf8.data(), static_cast<DWORD>(utf8.size()), &written, nullptr);
@@ -377,7 +388,7 @@ void CkitsuneDrvInstallerView::OnScan()
 	RefreshDeviceList();
 	CString summary;
 	summary.Format(Tr(TextId::ScanSummaryFormat),
-		scanned, static_cast<unsigned>(m_matches.size()));
+		static_cast<unsigned>(m_matches.size()));
 	AppendLog(summary.GetString());
 	SetBusy(false);
 }
