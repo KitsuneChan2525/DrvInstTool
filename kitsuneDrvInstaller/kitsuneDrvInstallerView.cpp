@@ -125,17 +125,9 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 void CkitsuneDrvInstallerView::OnInitialUpdate()
 {
 	CView::OnInitialUpdate();
-	const std::wstring dataRoot = ProgramDataRoot();
 	if (m_language.GetCount() != 3 || m_language.GetCurSel() == CB_ERR)
 		InitializeLanguageSelector();
 	UpdateTitle();
-	std::wstring compatibilityError;
-	if (FileExists(JoinPath(dataRoot, L"config.json")) &&
-		!SystemCompatibility::ValidateDriverMedia(dataRoot, compatibilityError))
-	{
-		AppendLog(Tr(TextId::UnsupportedSystemLog));
-		ShowSystemCompatibilityError(GetSafeHwnd(), compatibilityError);
-	}
 }
 
 void CkitsuneDrvInstallerView::OnDraw(CDC*) {}

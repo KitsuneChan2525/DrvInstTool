@@ -64,6 +64,18 @@ CkitsuneDrvInstallerApp theApp;
 
 namespace
 {
+	std::wstring ProgramDataRoot()
+	{
+		wchar_t module[MAX_PATH] = {};
+		GetModuleFileNameW(nullptr, module, _countof(module));
+		std::wstring executablePath(module);
+		const size_t slash = executablePath.find_last_of(L"\\/");
+		const std::wstring programDirectory = slash == std::wstring::npos
+			? std::wstring()
+			: executablePath.substr(0, slash);
+		return programDirectory + L"\\Data";
+	}
+
 	std::string JsonEscapeUtf8(const std::wstring& value)
 	{
 		if (value.empty()) return {};
@@ -205,6 +217,18 @@ BOOL CkitsuneDrvInstallerApp::InitInstance()
 	CWinAppEx::InitInstance();
 	Localization::SetLanguage(Localization::DetectSystemLanguage());
 	if (RunSelfTestIfRequested()) return FALSE;
+	const std::wstring dataRoot = ProgramDataRoot();
+	const std::wstring configPath = dataRoot + L"\\config.json";
+	if (GetFileAttributesW(configPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+	{
+		std::wstring compatibilityError;
+		if (!SystemCompatibility::ValidateDriverMedia(dataRoot, compatibilityError))
+		{
+			MessageBoxW(nullptr, compatibilityError.c_str(), Tr(TextId::UnsupportedSystemTitle),
+				MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+			return FALSE;
+		}
+	}
 
 
 	// 初始化 OLE 库
