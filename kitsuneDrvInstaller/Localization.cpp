@@ -73,7 +73,7 @@ namespace
 		{ L"Failed to detect the Windows version.", L"检测 Windows 版本失败。", L"偵測 Windows 版本失敗。" },
 		{ L"Unsupported system version", L"不支持的系统版本", L"不支援的系統版本" },
 		{ L"Use a compatible driver package before continuing driver installation.", L"请更换至兼容的驱动程序包后继续执行驱动程序安装", L"請更換為相容的驅動程式套件後再繼續執行驅動程式安裝" },
-		{ L"Startup failed: an unsupported operating system version was detected.", L"启动失败：检测到不支持的操作系统版本", L"啟動失敗：偵測到不支援的作業系統版本" }
+		{ L"Operation failed: an unsupported operating system version was detected.", L"操作失败：检测到不支持的操作系统版本", L"操作失敗：偵測到不支援的作業系統版本" }
 	};
 }
 

@@ -31,7 +31,6 @@ protected:
 	CStatic m_statusLabel;
 	CEdit m_dataRoot;
 	CEdit m_log;
-	CButton m_browse;
 	CButton m_scan;
 	CButton m_selectRecommended;
 	CButton m_install;
@@ -54,8 +53,6 @@ protected:
 	afx_msg int OnCreate(LPCREATESTRUCT createStruct);
 	afx_msg void OnSize(UINT type, int cx, int cy);
 	afx_msg BOOL OnEraseBkgnd(CDC* dc);
-	afx_msg void OnBrowse();
-	afx_msg void OnDataRootChanged();
 	afx_msg void OnScan();
 	afx_msg void OnSelectRecommended();
 	afx_msg void OnInstall();

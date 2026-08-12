@@ -5,8 +5,6 @@
 #include "kitsuneDrvInstallerView.h"
 #include "Localization.h"
 
-#include <ShlObj.h>
-
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -16,7 +14,6 @@ namespace
 	enum ControlId
 	{
 		IDC_DATA_ROOT = 2001,
-		IDC_BROWSE = 2002,
 		IDC_SCAN = 2003,
 		IDC_SELECT_RECOMMENDED = 2004,
 		IDC_INSTALL = 2005,
@@ -42,20 +39,11 @@ namespace
 		return slash == std::wstring::npos ? std::wstring() : path.substr(0, slash);
 	}
 
-	std::wstring DetectDataRoot()
+	std::wstring ProgramDataRoot()
 	{
 		wchar_t module[MAX_PATH] = {};
 		GetModuleFileNameW(nullptr, module, _countof(module));
-		const std::wstring exeDirectory = ParentDirectory(module);
-		const std::wstring candidates[] =
-		{
-			JoinPath(exeDirectory, L"Data"),
-			JoinPath(ParentDirectory(exeDirectory), L"Data"),
-			L"D:\\Project\\DrvInst\\Win7\\x64\\Data"
-		};
-		for (const auto& candidate : candidates)
-			if (FileExists(JoinPath(candidate, L"config.json"))) return candidate;
-		return candidates[0];
+		return JoinPath(ParentDirectory(module), L"Data");
 	}
 
 	void PumpMessages()
@@ -80,8 +68,6 @@ BEGIN_MESSAGE_MAP(CkitsuneDrvInstallerView, CView)
 	ON_WM_CREATE()
 	ON_WM_SIZE()
 	ON_WM_ERASEBKGND()
-	ON_BN_CLICKED(IDC_BROWSE, &CkitsuneDrvInstallerView::OnBrowse)
-	ON_EN_CHANGE(IDC_DATA_ROOT, &CkitsuneDrvInstallerView::OnDataRootChanged)
 	ON_BN_CLICKED(IDC_SCAN, &CkitsuneDrvInstallerView::OnScan)
 	ON_BN_CLICKED(IDC_SELECT_RECOMMENDED, &CkitsuneDrvInstallerView::OnSelectRecommended)
 	ON_BN_CLICKED(IDC_INSTALL, &CkitsuneDrvInstallerView::OnInstall)
@@ -118,8 +104,7 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 	m_language.AddString(L"繁體中文");
 	m_language.SetCurSel(static_cast<int>(Localization::GetLanguage()));
 	m_dataLabel.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
-	m_dataRoot.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, CRect(), this, IDC_DATA_ROOT);
-	m_browse.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_BROWSE);
+	m_dataRoot.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_READONLY, CRect(), this, IDC_DATA_ROOT);
 	m_scan.Create(L"", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, CRect(), this, IDC_SCAN);
 	m_listLabel.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
 	m_selectRecommended.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_SELECT_RECOMMENDED);
@@ -144,7 +129,7 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 void CkitsuneDrvInstallerView::OnInitialUpdate()
 {
 	CView::OnInitialUpdate();
-	const std::wstring dataRoot = DetectDataRoot();
+	const std::wstring dataRoot = ProgramDataRoot();
 	m_dataRoot.SetWindowTextW(dataRoot.c_str());
 	UpdateSubtitle();
 	if (GetParentFrame()) GetParentFrame()->SetWindowTextW(Tr(TextId::ViewTitle));
@@ -183,10 +168,8 @@ void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 	m_languageLabel.MoveWindow(width - margin - 270, 20, 90, 24);
 	m_language.MoveWindow(width - margin - 172, 17, 172, 220);
 	m_dataLabel.MoveWindow(margin, 82, 95, 24);
-	const int buttonWidth = 95;
 	m_scan.MoveWindow(width - margin - 105, 78, 105, 30);
-	m_browse.MoveWindow(width - margin - 105 - buttonWidth - 8, 78, buttonWidth, 30);
-	m_dataRoot.MoveWindow(margin + 100, 79, max(80, width - margin * 2 - 100 - 105 - buttonWidth - 16), 28);
+	m_dataRoot.MoveWindow(margin + 100, 79, max(80, width - margin * 2 - 100 - 105 - 8), 28);
 
 	m_listLabel.MoveWindow(margin, 122, 190, 24);
 	m_install.MoveWindow(width - margin - 125, 116, 125, 31);
@@ -204,11 +187,7 @@ void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 
 std::wstring CkitsuneDrvInstallerView::CurrentDataRoot() const
 {
-	CString text;
-	const_cast<CEdit&>(m_dataRoot).GetWindowTextW(text);
-	std::wstring result = text.GetString();
-	while (!result.empty() && (result.back() == L'\\' || result.back() == L'/')) result.pop_back();
-	return result;
+	return ProgramDataRoot();
 }
 
 void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
@@ -229,30 +208,11 @@ void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
 void CkitsuneDrvInstallerView::SetBusy(bool busy, const wchar_t* status)
 {
 	m_busy = busy;
-	m_browse.EnableWindow(!busy);
 	m_scan.EnableWindow(!busy);
 	m_selectRecommended.EnableWindow(!busy && !m_matches.empty());
 	m_install.EnableWindow(!busy && !m_matches.empty());
 	m_statusLabel.SetWindowTextW(status);
 	UpdateWindow();
-}
-
-void CkitsuneDrvInstallerView::OnBrowse()
-{
-	BROWSEINFOW info = {};
-	info.hwndOwner = GetSafeHwnd();
-	info.lpszTitle = Tr(TextId::BrowseTitle);
-	info.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
-	PIDLIST_ABSOLUTE item = SHBrowseForFolderW(&info);
-	if (!item) return;
-	wchar_t path[MAX_PATH] = {};
-	if (SHGetPathFromIDListW(item, path)) m_dataRoot.SetWindowTextW(path);
-	CoTaskMemFree(item);
-}
-
-void CkitsuneDrvInstallerView::OnDataRootChanged()
-{
-	UpdateSubtitle();
 }
 
 void CkitsuneDrvInstallerView::OnScan()
@@ -391,7 +351,6 @@ void CkitsuneDrvInstallerView::ApplyLanguage()
 	UpdateSubtitle();
 	m_languageLabel.SetWindowTextW(Tr(TextId::Language));
 	m_dataLabel.SetWindowTextW(Tr(TextId::DataDirectory));
-	m_browse.SetWindowTextW(Tr(TextId::Browse));
 	m_scan.SetWindowTextW(Tr(TextId::ScanHardware));
 	m_listLabel.SetWindowTextW(Tr(TextId::MatchedDevices));
 	m_selectRecommended.SetWindowTextW(Tr(TextId::SelectMissing));
