@@ -4,6 +4,7 @@
 #include "kitsuneDrvInstallerDoc.h"
 #include "kitsuneDrvInstallerView.h"
 #include "Localization.h"
+#include "MainFrm.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -447,6 +448,8 @@ void CkitsuneDrvInstallerView::OnInstall()
 		return;
 	}
 	SetBusy(true);
+	CMainFrame* mainFrame = DYNAMIC_DOWNCAST(CMainFrame, AfxGetMainWnd());
+	if (mainFrame) mainFrame->SetInstallationActive(true);
 	m_progress.SetRange32(0, static_cast<int>(selected.size()));
 	m_progress.SetPos(0);
 	int success = 0;
@@ -490,6 +493,7 @@ void CkitsuneDrvInstallerView::OnInstall()
 	summary += Tr(TextId::RestartToApply);
 	AppendLog(summary.GetString());
 	SetBusy(false);
+	if (mainFrame) mainFrame->SetInstallationActive(false);
 	::MessageBoxW(GetSafeHwnd(), summary, Tr(TextId::InstallCompleteTitle),
 		MB_OK | (failed == 0 ? MB_ICONINFORMATION : MB_ICONWARNING));
 }

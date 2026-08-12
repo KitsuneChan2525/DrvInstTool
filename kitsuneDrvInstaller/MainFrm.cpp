@@ -14,6 +14,9 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
 	ON_WM_CREATE()
 	ON_WM_SHOWWINDOW()
 	ON_WM_SYSCOMMAND()
+	ON_WM_CLOSE()
+	ON_WM_QUERYENDSESSION()
+	ON_COMMAND(ID_APP_EXIT, &CMainFrame::OnAppExit)
 	ON_WM_WINDOWPOSCHANGING()
 END_MESSAGE_MAP()
 
@@ -35,6 +38,7 @@ int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 	if (CMenu* systemMenu = GetSystemMenu(FALSE))
 	{
 		systemMenu->DeleteMenu(SC_SIZE, MF_BYCOMMAND);
+		systemMenu->DeleteMenu(SC_MINIMIZE, MF_BYCOMMAND);
 		systemMenu->DeleteMenu(SC_MAXIMIZE, MF_BYCOMMAND);
 	}
 	return 0;
@@ -54,7 +58,8 @@ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 	if (!CMDIFrameWndEx::PreCreateWindow(cs)) return FALSE;
 	// The installer supplies its complete title. Do not let the MDI framework
 	// append the active child/document title a second time.
-	cs.style &= ~(FWS_ADDTOTITLE | WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MAXIMIZE);
+	cs.style &= ~(FWS_ADDTOTITLE | WS_THICKFRAME | WS_MINIMIZEBOX |
+		WS_MAXIMIZEBOX | WS_MINIMIZE | WS_MAXIMIZE);
 	cs.cx = 1180;
 	cs.cy = 780;
 	// Set the final coordinates before CreateWindowEx. The frame is therefore
@@ -106,8 +111,36 @@ void CMainFrame::OnShowWindow(BOOL show, UINT status)
 void CMainFrame::OnSysCommand(UINT id, LPARAM parameter)
 {
 	const UINT command = id & 0xFFF0;
-	if (command == SC_SIZE || command == SC_MAXIMIZE) return;
+	if (command == SC_SIZE || command == SC_MINIMIZE || command == SC_MAXIMIZE ||
+		(m_installationActive && command == SC_CLOSE)) return;
 	CMDIFrameWndEx::OnSysCommand(id, parameter);
+}
+
+void CMainFrame::SetInstallationActive(bool active)
+{
+	m_installationActive = active;
+	if (CMenu* systemMenu = GetSystemMenu(FALSE))
+		systemMenu->EnableMenuItem(SC_CLOSE, MF_BYCOMMAND |
+			(active ? MF_GRAYED : MF_ENABLED));
+	DrawMenuBar();
+}
+
+void CMainFrame::OnClose()
+{
+	if (m_installationActive) return;
+	CMDIFrameWndEx::OnClose();
+}
+
+BOOL CMainFrame::OnQueryEndSession()
+{
+	if (m_installationActive) return FALSE;
+	return CMDIFrameWndEx::OnQueryEndSession();
+}
+
+void CMainFrame::OnAppExit()
+{
+	if (m_installationActive) return;
+	SendMessageW(WM_CLOSE);
 }
 
 void CMainFrame::OnWindowPosChanging(WINDOWPOS* position)
