@@ -8,7 +8,7 @@ public:
 	virtual ~CMainFrame();
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 	virtual void OnUpdateFrameMenu(HMENU hMenuAlt);
-	void CenterOnCurrentScreen();
+	void CenterBeforeFirstShow();
 
 #ifdef _DEBUG
 	virtual void AssertValid() const;
@@ -17,6 +17,8 @@ public:
 
 protected:
 	CMFCStatusBar m_statusBar;
+	bool m_firstShowCentered = false;
 	afx_msg int OnCreate(LPCREATESTRUCT createStruct);
+	afx_msg void OnShowWindow(BOOL show, UINT status);
 	DECLARE_MESSAGE_MAP()
 };

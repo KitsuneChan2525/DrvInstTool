@@ -12,6 +12,7 @@ IMPLEMENT_DYNAMIC(CMainFrame, CMDIFrameWndEx)
 
 BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
 	ON_WM_CREATE()
+	ON_WM_SHOWWINDOW()
 END_MESSAGE_MAP()
 
 static UINT indicators[] = { ID_SEPARATOR };
@@ -54,10 +55,21 @@ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 	cs.cx = 1180;
 	cs.cy = 780;
 	cs.style &= ~WS_MAXIMIZE;
+	// Set the final coordinates before CreateWindowEx. The frame is therefore
+	// born at the centered position and never paints at a saved/old position.
+	POINT cursor = {};
+	GetCursorPos(&cursor);
+	const HMONITOR monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTOPRIMARY);
+	MONITORINFO info = { sizeof(info) };
+	if (GetMonitorInfoW(monitor, &info))
+	{
+		cs.x = info.rcWork.left + (info.rcWork.right - info.rcWork.left - cs.cx) / 2;
+		cs.y = info.rcWork.top + (info.rcWork.bottom - info.rcWork.top - cs.cy) / 2;
+	}
 	return TRUE;
 }
 
-void CMainFrame::CenterOnCurrentScreen()
+void CMainFrame::CenterBeforeFirstShow()
 {
 	POINT cursor = {};
 	GetCursorPos(&cursor);
@@ -70,7 +82,19 @@ void CMainFrame::CenterOnCurrentScreen()
 	const int x = info.rcWork.left + (info.rcWork.right - info.rcWork.left - windowRect.Width()) / 2;
 	const int y = info.rcWork.top + (info.rcWork.bottom - info.rcWork.top - windowRect.Height()) / 2;
 	SetWindowPos(nullptr, x, y, 0, 0,
-		SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+		SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW);
+}
+
+void CMainFrame::OnShowWindow(BOOL show, UINT status)
+{
+	// WM_SHOWWINDOW arrives before the first visible frame is composed. Apply
+	// the final position here so even a late MFC placement restore stays hidden.
+	if (show && !m_firstShowCentered)
+	{
+		CenterBeforeFirstShow();
+		m_firstShowCentered = true;
+	}
+	CMDIFrameWndEx::OnShowWindow(show, status);
 }
 
 #ifdef _DEBUG

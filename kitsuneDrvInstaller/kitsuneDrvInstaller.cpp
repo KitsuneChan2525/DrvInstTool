@@ -209,6 +209,9 @@ BOOL CkitsuneDrvInstallerApp::InitInstance()
 		delete pMainFrame;
 		return FALSE;
 	}
+	// LoadFrame may restore a saved registry position. Override it while the
+	// frame is still hidden, before ProcessShellCommand creates the visible UI.
+	pMainFrame->CenterBeforeFirstShow();
 	m_pMainWnd = pMainFrame;
 
 
@@ -228,7 +231,6 @@ BOOL CkitsuneDrvInstallerApp::InitInstance()
 	if (pMainFrame->MDIGetActive() != nullptr)
 		pMainFrame->MDIMaximize(pMainFrame->MDIGetActive());
 	// 主窗口已初始化，因此显示它并对其进行更新
-	pMainFrame->CenterOnCurrentScreen();
 	pMainFrame->ShowWindow(SW_SHOWNORMAL);
 	pMainFrame->UpdateWindow();
 
