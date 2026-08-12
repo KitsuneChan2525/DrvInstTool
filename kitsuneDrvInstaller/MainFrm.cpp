@@ -19,12 +19,16 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
 	ON_WM_QUERYENDSESSION()
 	ON_COMMAND(ID_APP_EXIT, &CMainFrame::OnAppExit)
 	ON_MESSAGE(WM_SETMESSAGESTRING, &CMainFrame::OnSetMessageString)
+	ON_MESSAGE(WM_SETICON, &CMainFrame::OnSetIcon)
 	ON_WM_TIMER()
 	ON_WM_WINDOWPOSCHANGING()
 END_MESSAGE_MAP()
 
 CMainFrame::CMainFrame() noexcept {}
-CMainFrame::~CMainFrame() = default;
+CMainFrame::~CMainFrame()
+{
+	if (m_blankCaptionIcon != nullptr) DestroyIcon(m_blankCaptionIcon);
+}
 
 int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 {
@@ -45,6 +49,17 @@ int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 	EnableMDITabs(FALSE);
 	CMFCVisualManager::SetDefaultManager(RUNTIME_CLASS(CMFCVisualManagerWindows));
 	SetWindowTextW(Tr(TextId::AppTitle));
+	// MFC restores IDR_MAINFRAME after creating the frame. Install a fully
+	// transparent icon for both caption sizes and reject later replacements.
+	// This removes the visible MFC cube icon without removing the close button.
+	const BYTE andMask[] = { 0xFF, 0xFF, 0xFF, 0xFF };
+	const BYTE xorMask[] = { 0x00, 0x00, 0x00, 0x00 };
+	m_blankCaptionIcon = CreateIcon(AfxGetInstanceHandle(), 1, 1, 1, 1, andMask, xorMask);
+	if (m_blankCaptionIcon != nullptr)
+	{
+		DefWindowProcW(WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(m_blankCaptionIcon));
+		DefWindowProcW(WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(m_blankCaptionIcon));
+	}
 	if (CMenu* systemMenu = GetSystemMenu(FALSE))
 	{
 		systemMenu->DeleteMenu(SC_SIZE, MF_BYCOMMAND);
@@ -75,6 +90,14 @@ LRESULT CMainFrame::OnSetMessageString(WPARAM wParam, LPARAM lParam)
 	const LRESULT result = CMDIFrameWndEx::OnSetMessageString(wParam, lParam);
 	RefreshVersionStatus();
 	return result;
+}
+
+LRESULT CMainFrame::OnSetIcon(WPARAM wParam, LPARAM)
+{
+	// LoadFrame and shell integration can reapply the resource icon after
+	// OnCreate; always retain the transparent caption icon instead.
+	return m_blankCaptionIcon == nullptr ? 0 :
+		DefWindowProcW(WM_SETICON, wParam, reinterpret_cast<LPARAM>(m_blankCaptionIcon));
 }
 
 void CMainFrame::OnTimer(UINT_PTR timerId)
