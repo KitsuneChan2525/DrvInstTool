@@ -96,11 +96,11 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 	m_title.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
 	m_title.SetFont(&m_titleFont);
 	m_languageLabel.Create(L"", WS_CHILD | WS_VISIBLE | SS_RIGHT, CRect(), this);
-	m_language.Create(WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, CRect(), this, IDC_LANGUAGE);
-	m_language.AddString(L"English");
-	m_language.AddString(L"简体中文");
-	m_language.AddString(L"繁體中文");
-	m_language.SetCurSel(static_cast<int>(Localization::GetLanguage()));
+	if (!m_language.Create(WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST |
+		CBS_HASSTRINGS | CBS_NOINTEGRALHEIGHT | WS_VSCROLL, CRect(0, 0, 180, 240), this, IDC_LANGUAGE))
+		return -1;
+	m_language.SetFont(CFont::FromHandle(static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT))), FALSE);
+	if (!InitializeLanguageSelector()) return -1;
 	m_scan.Create(L"", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, CRect(), this, IDC_SCAN);
 	m_listLabel.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
 	m_selectRecommended.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_SELECT_RECOMMENDED);
@@ -119,6 +119,9 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 	m_log.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL,
 		CRect(), this, IDC_LOG);
 	ApplyLanguage();
+	CRect clientRect;
+	GetClientRect(&clientRect);
+	LayoutControls(clientRect.Width(), clientRect.Height());
 	return 0;
 }
 
@@ -126,6 +129,8 @@ void CkitsuneDrvInstallerView::OnInitialUpdate()
 {
 	CView::OnInitialUpdate();
 	const std::wstring dataRoot = ProgramDataRoot();
+	if (m_language.GetCount() != 3 || m_language.GetCurSel() == CB_ERR)
+		InitializeLanguageSelector();
 	UpdateTitle();
 	std::wstring compatibilityError;
 	if (FileExists(JoinPath(dataRoot, L"config.json")) &&
@@ -166,24 +171,68 @@ void CkitsuneDrvInstallerView::OnSize(UINT type, int cx, int cy)
 void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 {
 	const int margin = 22;
+	const int gap = 8;
 	const int contentWidth = max(300, width - margin * 2);
-	m_title.MoveWindow(margin, 16, contentWidth, 34);
-	m_languageLabel.MoveWindow(width - margin - 270, 20, 90, 24);
-	m_language.MoveWindow(width - margin - 172, 17, 172, 220);
-	m_scan.MoveWindow(width - margin - 105, 54, 105, 30);
 
-	m_listLabel.MoveWindow(margin, 62, 190, 24);
-	m_install.MoveWindow(width - margin - 125, 92, 125, 31);
-	m_selectRecommended.MoveWindow(width - margin - 125 - 132, 92, 124, 31);
-	m_statusLabel.MoveWindow(margin + 200, 62, max(50, width - margin * 2 - 470), 23);
+	// Header: keep the language selector at the upper-right and reserve the
+	// remaining width for the package title so the controls never overlap.
+	const int languageWidth = 172;
+	const int languageLabelWidth = 74;
+	const int languageX = width - margin - languageWidth;
+	const int languageLabelX = languageX - gap - languageLabelWidth;
+	m_title.MoveWindow(margin, 16, max(120, languageLabelX - margin - 14), 36);
+	m_languageLabel.MoveWindow(languageLabelX, 21, languageLabelWidth, 24);
+	m_language.SetWindowPos(nullptr, languageX, 17, languageWidth, 240,
+		SWP_NOZORDER | SWP_SHOWWINDOW);
 
-	const int logHeight = 98;
-	const int bottomArea = 32 + 22 + logHeight + margin;
-	const int listHeight = max(100, height - 128 - bottomArea);
-	m_devices.MoveWindow(margin, 127, contentWidth, listHeight);
-	m_progress.MoveWindow(margin, 134 + listHeight, contentWidth, 17);
-	m_logLabel.MoveWindow(margin, 157 + listHeight, 100, 22);
-	m_log.MoveWindow(margin, 179 + listHeight, contentWidth, max(50, height - (179 + listHeight) - margin));
+	// Section heading and status share one row; all three actions share the
+	// next row in execution order.
+	m_listLabel.MoveWindow(margin, 62, 270, 24);
+	m_statusLabel.MoveWindow(margin + 280, 62, max(80, contentWidth - 280), 24);
+	const int scanWidth = 112;
+	const int selectWidth = 140;
+	const int installWidth = 140;
+	const int installX = width - margin - installWidth;
+	const int selectX = installX - gap - selectWidth;
+	const int scanX = selectX - gap - scanWidth;
+	m_scan.MoveWindow(scanX, 91, scanWidth, 32);
+	m_selectRecommended.MoveWindow(selectX, 91, selectWidth, 32);
+	m_install.MoveWindow(installX, 91, installWidth, 32);
+
+	// The device list receives all flexible vertical space. Progress and log
+	// areas stay anchored to the bottom for a stable layout at every size.
+	const int devicesTop = 134;
+	const int logHeight = max(96, min(150, height / 5));
+	const int logTop = height - margin - logHeight;
+	const int logLabelY = logTop - 25;
+	const int progressY = logLabelY - 23;
+	const int devicesBottom = progressY - gap;
+	const int listHeight = max(100, devicesBottom - devicesTop);
+	m_devices.MoveWindow(margin, devicesTop, contentWidth, listHeight);
+	m_progress.MoveWindow(margin, devicesTop + listHeight + gap, contentWidth, 17);
+	m_logLabel.MoveWindow(margin, logLabelY, 160, 22);
+	m_log.MoveWindow(margin, logTop, contentWidth, max(50, height - logTop - margin));
+}
+
+bool CkitsuneDrvInstallerView::InitializeLanguageSelector()
+{
+	if (!m_language.GetSafeHwnd()) return false;
+	m_language.SetRedraw(FALSE);
+	m_language.ResetContent();
+	const wchar_t* const languages[] = { L"English", L"简体中文", L"繁體中文" };
+	for (const wchar_t* language : languages)
+	{
+		if (m_language.AddString(language) != CB_ERR) continue;
+		m_language.SetRedraw(TRUE);
+		return false;
+	}
+	int selection = static_cast<int>(Localization::GetLanguage());
+	if (selection < 0 || selection >= _countof(languages)) selection = 0;
+	if (m_language.SetCurSel(selection) == CB_ERR) m_language.SetCurSel(0);
+	m_language.SetRedraw(TRUE);
+	m_language.ShowWindow(SW_SHOW);
+	m_language.Invalidate(FALSE);
+	return m_language.GetCount() == _countof(languages) && m_language.GetCurSel() != CB_ERR;
 }
 
 std::wstring CkitsuneDrvInstallerView::CurrentDataRoot() const

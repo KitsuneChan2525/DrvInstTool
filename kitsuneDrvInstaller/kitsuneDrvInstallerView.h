@@ -45,6 +45,7 @@ protected:
 	void RefreshDeviceList();
 	void UpdateTitle();
 	void ApplyLanguage();
+	bool InitializeLanguageSelector();
 	std::wstring CurrentDataRoot() const;
 
 	afx_msg int OnCreate(LPCREATESTRUCT createStruct);
