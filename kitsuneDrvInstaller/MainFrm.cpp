@@ -17,8 +17,6 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
 	ON_WM_WINDOWPOSCHANGING()
 END_MESSAGE_MAP()
 
-static UINT indicators[] = { ID_SEPARATOR };
-
 CMainFrame::CMainFrame() noexcept {}
 CMainFrame::~CMainFrame() = default;
 
@@ -32,8 +30,6 @@ int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 	CMDITabInfo tabs;
 	EnableMDITabbedGroups(FALSE, tabs);
 	EnableMDITabs(FALSE);
-	if (!m_statusBar.Create(this)) return -1;
-	m_statusBar.SetIndicators(indicators, _countof(indicators));
 	CMFCVisualManager::SetDefaultManager(RUNTIME_CLASS(CMFCVisualManagerWindows));
 	SetWindowTextW(Tr(TextId::AppTitle));
 	if (CMenu* systemMenu = GetSystemMenu(FALSE))

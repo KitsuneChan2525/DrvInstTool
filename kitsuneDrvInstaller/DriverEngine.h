@@ -26,6 +26,7 @@ struct DeviceMatch
 	std::wstring hardwareId;
 	std::wstring indexedDeviceName;
 	DriverPackage driver;
+	std::wstring installedDriverProvider;
 	std::wstring installedDriverVersion;
 	std::wstring installedDriverDate;
 	bool needsDriver = false;

@@ -16,7 +16,6 @@ public:
 #endif
 
 protected:
-	CMFCStatusBar m_statusBar;
 	bool m_firstShowCentered = false;
 	bool m_fixedSizeActive = false;
 	CSize m_fixedWindowSize;

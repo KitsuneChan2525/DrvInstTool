@@ -1066,14 +1066,25 @@ bool DeviceScanner::Scan(const DriverCatalog& catalog, std::vector<DeviceMatch>&
 		DeviceMatch match;
 		wchar_t instanceId[4096] = {};
 		if (SetupDiGetDeviceInstanceIdW(set, &device, instanceId, _countof(instanceId), nullptr)) match.instanceId = instanceId;
-		match.displayName = GetDeviceText(set, device, SPDRP_FRIENDLYNAME);
-		if (match.displayName.empty()) match.displayName = GetDeviceText(set, device, SPDRP_DEVICEDESC);
-		if (match.displayName.empty()) match.displayName = indexedName.empty() ? matchedId : indexedName;
+		std::vector<BYTE> installedDriver;
+		match.needsDriver = !ReadRegistryProperty(set, device, SPDRP_DRIVER, installedDriver);
+		match.installedDriverProvider = match.needsDriver ? std::wstring() :
+			ReadDriverRegistryString(set, device, L"ProviderName");
+		const bool usesGenericDriver = !match.needsDriver &&
+			SameText(match.installedDriverProvider, L"Microsoft");
+		const bool providerChanged = !match.needsDriver &&
+			!SameText(match.installedDriverProvider, package.provider);
+		if ((match.needsDriver || usesGenericDriver || providerChanged) && !indexedName.empty())
+			match.displayName = indexedName;
+		else
+		{
+			match.displayName = GetDeviceText(set, device, SPDRP_FRIENDLYNAME);
+			if (match.displayName.empty()) match.displayName = GetDeviceText(set, device, SPDRP_DEVICEDESC);
+			if (match.displayName.empty()) match.displayName = indexedName.empty() ? matchedId : indexedName;
+		}
 		match.hardwareId = matchedId;
 		match.indexedDeviceName = indexedName;
 		match.driver = package;
-		std::vector<BYTE> installedDriver;
-		match.needsDriver = !ReadRegistryProperty(set, device, SPDRP_DRIVER, installedDriver);
 		if (!match.needsDriver)
 		{
 			match.installedDriverVersion = ReadDriverRegistryString(set, device, L"DriverVersion");

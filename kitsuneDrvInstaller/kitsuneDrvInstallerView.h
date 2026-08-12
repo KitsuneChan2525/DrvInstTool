@@ -26,7 +26,6 @@ protected:
 	CComboBox m_language;
 	CStatic m_listLabel;
 	CStatic m_logLabel;
-	CStatic m_statusLabel;
 	CEdit m_log;
 	CButton m_scan;
 	CButton m_selectRecommended;
@@ -41,7 +40,7 @@ protected:
 
 	void LayoutControls(int width, int height);
 	void AppendLog(const std::wstring& text);
-	void SetBusy(bool busy, const wchar_t* status);
+	void SetBusy(bool busy);
 	void RefreshDeviceList();
 	void UpdateTitle();
 	void ApplyLanguage();

@@ -105,7 +105,6 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 	m_listLabel.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
 	m_selectRecommended.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_SELECT_RECOMMENDED);
 	m_install.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_INSTALL);
-	m_statusLabel.Create(L"", WS_CHILD | WS_VISIBLE | SS_RIGHT, CRect(), this);
 	m_devices.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | LVS_REPORT | LVS_SHOWSELALWAYS, CRect(), this, IDC_DEVICE_LIST);
 	m_devices.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER | LVS_EX_CHECKBOXES);
 	m_devices.InsertColumn(0, L"", LVCFMT_LEFT, 265);
@@ -185,10 +184,8 @@ void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 	m_language.SetWindowPos(nullptr, languageX, 17, languageWidth, 240,
 		SWP_NOZORDER | SWP_SHOWWINDOW);
 
-	// Section heading and status share one row; all three actions share the
-	// next row in execution order.
-	m_listLabel.MoveWindow(margin, 62, 270, 24);
-	m_statusLabel.MoveWindow(margin + 280, 62, max(80, contentWidth - 280), 24);
+	// Section heading uses the full row; all three actions share the next row.
+	m_listLabel.MoveWindow(margin, 62, contentWidth, 24);
 	const int scanWidth = 112;
 	const int selectWidth = 140;
 	const int installWidth = 140;
@@ -255,13 +252,12 @@ void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
 	PumpMessages();
 }
 
-void CkitsuneDrvInstallerView::SetBusy(bool busy, const wchar_t* status)
+void CkitsuneDrvInstallerView::SetBusy(bool busy)
 {
 	m_busy = busy;
 	m_scan.EnableWindow(!busy);
 	m_selectRecommended.EnableWindow(!busy && !m_matches.empty());
 	m_install.EnableWindow(!busy && !m_matches.empty());
-	m_statusLabel.SetWindowTextW(status);
 	UpdateWindow();
 }
 
@@ -281,24 +277,23 @@ void CkitsuneDrvInstallerView::OnScan()
 		ShowSystemCompatibilityError(GetSafeHwnd(), error);
 		return;
 	}
-	SetBusy(true, Tr(TextId::LoadingIndex));
+	SetBusy(true);
 	m_progress.SetRange32(0, 100);
 	m_progress.SetPos(12);
 	AppendLog(std::wstring(Tr(TextId::LoadingIndex)) + L" " + root);
 	if (!m_catalog.Load(root, error))
 	{
 		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + error);
-		SetBusy(false, Tr(TextId::IndexLoadFailed));
+		SetBusy(false);
 		AfxMessageBox(error.c_str(), MB_ICONERROR);
 		return;
 	}
 	m_progress.SetPos(58);
-	m_statusLabel.SetWindowTextW(Tr(TextId::EnumeratingDevices));
 	int scanned = 0;
 	if (!DeviceScanner::Scan(m_catalog, m_matches, scanned, error))
 	{
 		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + error);
-		SetBusy(false, Tr(TextId::DeviceScanFailed));
+		SetBusy(false);
 		AfxMessageBox(error.c_str(), MB_ICONERROR);
 		return;
 	}
@@ -308,7 +303,7 @@ void CkitsuneDrvInstallerView::OnScan()
 	summary.Format(Tr(TextId::ScanSummaryFormat),
 		scanned, static_cast<unsigned>(m_matches.size()), static_cast<unsigned>(m_catalog.DriverCount()), static_cast<unsigned>(m_catalog.HardwareIdCount()));
 	AppendLog(summary.GetString());
-	SetBusy(false, summary);
+	SetBusy(false);
 }
 
 void CkitsuneDrvInstallerView::RefreshDeviceList()
@@ -364,7 +359,7 @@ void CkitsuneDrvInstallerView::OnInstall()
 		return;
 	}
 	AppendLog(std::wstring(Tr(TextId::UsingExtractor)) + sevenZip);
-	SetBusy(true, Tr(TextId::InstallingDrivers));
+	SetBusy(true);
 	m_progress.SetRange32(0, static_cast<int>(selected.size()));
 	m_progress.SetPos(0);
 	int success = 0;
@@ -373,7 +368,6 @@ void CkitsuneDrvInstallerView::OnInstall()
 	{
 		const int row = selected[position];
 		DeviceMatch& match = m_matches[static_cast<size_t>(row)];
-		m_statusLabel.SetWindowTextW((std::wstring(Tr(TextId::StartInstall)) + match.displayName).c_str());
 		AppendLog(std::wstring(Tr(TextId::StartInstall)) + match.displayName + L" [" + match.driver.id + L"]");
 		bool reboot = false;
 		std::wstring error;
@@ -396,7 +390,7 @@ void CkitsuneDrvInstallerView::OnInstall()
 	CString summary;
 	summary.Format(Tr(TextId::InstallSummaryFormat), success, static_cast<unsigned>(selected.size()), anyReboot ? Tr(TextId::RebootSuffix) : L"");
 	AppendLog(summary.GetString());
-	SetBusy(false, summary);
+	SetBusy(false);
 	AfxMessageBox(summary, success == static_cast<int>(selected.size()) ? MB_ICONINFORMATION : MB_ICONWARNING);
 }
 
@@ -409,7 +403,6 @@ void CkitsuneDrvInstallerView::ApplyLanguage()
 	m_selectRecommended.SetWindowTextW(Tr(TextId::SelectMissing));
 	m_install.SetWindowTextW(Tr(TextId::InstallSelected));
 	m_logLabel.SetWindowTextW(Tr(TextId::OperationLog));
-	if (!m_busy) m_statusLabel.SetWindowTextW(Tr(TextId::Ready));
 	const TextId columns[] = { TextId::ColumnDevice, TextId::ColumnCategory, TextId::ColumnProvider,
 		TextId::ColumnVersion, TextId::ColumnDate, TextId::ColumnStatus };
 	for (int index = 0; index < _countof(columns); ++index)
@@ -425,11 +418,7 @@ void CkitsuneDrvInstallerView::ApplyLanguage()
 
 void CkitsuneDrvInstallerView::UpdateTitle()
 {
-	std::wstring targetSystem;
-	std::wstring targetArchitecture;
-	std::wstring title = L"kitsune Driver Installer - [Unknown]";
-	if (SystemCompatibility::GetDriverMediaTarget(CurrentDataRoot(), targetSystem, targetArchitecture))
-		title = L"kitsune Driver Installer - [" + targetSystem + L" " + targetArchitecture + L"]";
+	const std::wstring title = L"kitsune Driver Installer";
 	m_title.SetWindowTextW(title.c_str());
 	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(title.c_str());
 }

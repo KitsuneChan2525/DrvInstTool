@@ -122,6 +122,10 @@ namespace
 			else if (match.updateAvailable) ++updateDrivers;
 			else ++installedDrivers;
 		}
+		size_t indexedNameFallbackCount = 0;
+		for (const auto& match : matches)
+			if (!match.indexedDeviceName.empty() && match.displayName == match.indexedDeviceName)
+				++indexedNameFallbackCount;
 		size_t ambiguousBluetoothProfileMatches = 0;
 		for (const auto& match : matches)
 		{
@@ -153,6 +157,7 @@ namespace
 			<< "  \"missing_driver_count\": " << missingDrivers << ",\n"
 			<< "  \"update_driver_count\": " << updateDrivers << ",\n"
 			<< "  \"installed_driver_count\": " << installedDrivers << ",\n"
+			<< "  \"indexed_name_fallback_count\": " << indexedNameFallbackCount << ",\n"
 			<< "  \"ambiguous_bluetooth_profile_match_count\": " << ambiguousBluetoothProfileMatches << ",\n"
 			<< "  \"matches\": [\n";
 		for (size_t index = 0; index < matches.size(); ++index)
@@ -162,7 +167,10 @@ namespace
 				<< "\", \"hardware_id\": \"" << JsonEscapeUtf8(match.hardwareId)
 				<< "\", \"driver_id\": \"" << JsonEscapeUtf8(match.driver.id)
 				<< "\", \"provider\": \"" << JsonEscapeUtf8(match.driver.provider)
-				<< "\", \"device_class\": \"" << JsonEscapeUtf8(match.driver.deviceClass)
+				<< "\", \"installed_provider\": \"" << JsonEscapeUtf8(match.installedDriverProvider)
+				<< "\", \"uses_indexed_name\": " <<
+					(!match.indexedDeviceName.empty() && match.displayName == match.indexedDeviceName ? "true" : "false")
+				<< ", \"device_class\": \"" << JsonEscapeUtf8(match.driver.deviceClass)
 				<< "\"}" << (index + 1 < matches.size() ? "," : "") << "\n";
 		}
 		report << "  ],\n"

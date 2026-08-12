@@ -22,7 +22,6 @@ enum class TextId
 	MatchedDevices,
 	SelectMissing,
 	InstallSelected,
-	Ready,
 	ColumnDevice,
 	ColumnCategory,
 	ColumnProvider,
