@@ -84,10 +84,16 @@ UiLanguage Localization::DetectSystemLanguage()
 {
 	const LANGID language = GetUserDefaultUILanguage();
 	if (PRIMARYLANGID(language) != LANG_CHINESE) return UiLanguage::English;
+
 	const WORD sub = SUBLANGID(language);
-	if (sub == SUBLANG_CHINESE_TRADITIONAL || sub == SUBLANG_CHINESE_HONGKONG || sub == SUBLANG_CHINESE_MACAU)
+	if (sub == SUBLANG_CHINESE_SIMPLIFIED || sub == SUBLANG_CHINESE_SINGAPORE)
+		return UiLanguage::ChineseSimplified;
+	if (sub == SUBLANG_CHINESE_TRADITIONAL || sub == SUBLANG_CHINESE_HONGKONG ||
+		sub == SUBLANG_CHINESE_MACAU)
 		return UiLanguage::ChineseTraditional;
-	return UiLanguage::ChineseSimplified;
+
+	// English is the fallback for every unrecognized or neutral UI language.
+	return UiLanguage::English;
 }
 
 const wchar_t* Localization::Text(TextId id)
