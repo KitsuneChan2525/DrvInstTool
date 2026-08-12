@@ -27,6 +27,16 @@ END_MESSAGE_MAP()
 CMainFrame::CMainFrame() noexcept {}
 CMainFrame::~CMainFrame() = default;
 
+LRESULT CMainFrame::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+	const bool mouseInput = message >= WM_LBUTTONDOWN && message <= WM_XBUTTONDBLCLK;
+	const bool nonClientMouseInput = message >= WM_NCLBUTTONDOWN && message <= WM_NCXBUTTONDBLCLK;
+	const bool keyboardInput = message >= WM_KEYFIRST && message <= WM_KEYLAST;
+	if (mouseInput || nonClientMouseInput || keyboardInput)
+		theApp.NotifyAiUserActivity();
+	return CMDIFrameWndEx::WindowProc(message, wParam, lParam);
+}
+
 int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 {
 	if (CMDIFrameWndEx::OnCreate(createStruct) == -1) return -1;

@@ -25,6 +25,9 @@ namespace
 		, IDC_LANGUAGE = 2009
 	};
 	constexpr UINT WM_AUTO_SCAN = WM_APP + 1;
+	constexpr UINT_PTR AI_INSTALL_TIMER = 2;
+	constexpr UINT_PTR AI_EXIT_TIMER = 3;
+	constexpr UINT_PTR AI_ACTIVITY_TIMER = 4;
 
 	bool FileExists(const std::wstring& path)
 	{
@@ -86,10 +89,22 @@ BEGIN_MESSAGE_MAP(CkitsuneDrvInstallerView, CView)
 	ON_CBN_SELCHANGE(IDC_LANGUAGE, &CkitsuneDrvInstallerView::OnLanguageChanged)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_DEVICE_LIST, &CkitsuneDrvInstallerView::OnDeviceItemChanged)
 	ON_MESSAGE(WM_AUTO_SCAN, &CkitsuneDrvInstallerView::OnAutoScan)
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 CkitsuneDrvInstallerView::CkitsuneDrvInstallerView() noexcept {}
-CkitsuneDrvInstallerView::~CkitsuneDrvInstallerView() = default;
+CkitsuneDrvInstallerView::~CkitsuneDrvInstallerView()
+{
+	if (theApp.m_pMainWnd != nullptr) theApp.SetInstallerView(nullptr);
+}
+
+LRESULT CkitsuneDrvInstallerView::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+	const bool mouseInput = message >= WM_LBUTTONDOWN && message <= WM_XBUTTONDBLCLK;
+	const bool keyboardInput = message >= WM_KEYFIRST && message <= WM_KEYLAST;
+	if (mouseInput || keyboardInput) theApp.NotifyAiUserActivity();
+	return CView::WindowProc(message, wParam, lParam);
+}
 
 BOOL CkitsuneDrvInstallerView::PreCreateWindow(CREATESTRUCT& cs)
 {
@@ -100,6 +115,7 @@ BOOL CkitsuneDrvInstallerView::PreCreateWindow(CREATESTRUCT& cs)
 int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 {
 	if (CView::OnCreate(createStruct) == -1) return -1;
+	theApp.SetInstallerView(this);
 	if (!m_backgroundBrush.CreateSolidBrush(ViewBackgroundColor)) return -1;
 
 	NONCLIENTMETRICSW metrics = {};
@@ -122,6 +138,8 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 	titleLogFont.lfWeight = FW_SEMIBOLD;
 	if (!m_titleFont.CreateFontIndirectW(&titleLogFont)) return -1;
 	Localization::SetLanguage(Localization::DetectSystemLanguage());
+	m_aiMode = theApp.IsAiMode();
+	m_aiInteractionEnabled = !m_aiMode;
 	m_title.Create(L"", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE | SS_NOPREFIX, CRect(), this);
 	m_title.SetFont(&m_titleFont);
 	m_languageLabel.Create(L"", WS_CHILD | WS_VISIBLE | SS_RIGHT, CRect(), this);
@@ -154,6 +172,7 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 		CRect(), this, IDC_LOG);
 	m_log.SetFont(&m_uiFont);
 	ApplyLanguage();
+	UpdateInteractionState();
 	CRect clientRect;
 	GetClientRect(&clientRect);
 	LayoutControls(clientRect.Width(), clientRect.Height());
@@ -346,15 +365,20 @@ void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
 void CkitsuneDrvInstallerView::SetBusy(bool busy)
 {
 	m_busy = busy;
-	// PumpMessages keeps the installer responsive while a driver is installed.
-	// Disable every interactive child so queued input cannot change language,
-	// selection, check boxes, or start another operation during that interval.
-	m_language.EnableWindow(!busy);
-	m_devices.EnableWindow(!busy);
-	m_scan.EnableWindow(!busy);
-	m_selectRecommended.EnableWindow(!busy && !m_matches.empty());
-	UpdateInstallButtonState();
+	UpdateInteractionState();
 	UpdateWindow();
+}
+
+void CkitsuneDrvInstallerView::UpdateInteractionState()
+{
+	const bool enabled = !m_busy && (!m_aiMode || m_aiInteractionEnabled);
+	m_language.EnableWindow(enabled);
+	// Keep driver check boxes available during the /ai countdown so the user
+	// can adjust the installation set. Actual installation still locks the list.
+	m_devices.EnableWindow(!m_busy);
+	m_scan.EnableWindow(enabled);
+	m_selectRecommended.EnableWindow(enabled && !m_matches.empty());
+	m_install.EnableWindow(enabled && HasCheckedDrivers());
 }
 
 bool CkitsuneDrvInstallerView::HasCheckedDrivers()
@@ -366,7 +390,7 @@ bool CkitsuneDrvInstallerView::HasCheckedDrivers()
 
 void CkitsuneDrvInstallerView::UpdateInstallButtonState()
 {
-	m_install.EnableWindow(!m_busy && HasCheckedDrivers());
+	UpdateInteractionState();
 }
 
 void CkitsuneDrvInstallerView::OnDeviceItemChanged(NMHDR* notifyHeader, LRESULT* result)
@@ -379,7 +403,10 @@ void CkitsuneDrvInstallerView::OnDeviceItemChanged(NMHDR* notifyHeader, LRESULT*
 	const NMLISTVIEW* item = reinterpret_cast<NMLISTVIEW*>(notifyHeader);
 	if ((item->uChanged & LVIF_STATE) != 0 &&
 		((item->uOldState ^ item->uNewState) & LVIS_STATEIMAGEMASK) != 0)
+	{
+		CancelAiCountdownForUserInput();
 		UpdateInstallButtonState();
+	}
 	*result = 0;
 }
 
@@ -420,12 +447,79 @@ void CkitsuneDrvInstallerView::OnScan()
 		return;
 	}
 	m_progress.SetPos(100);
+	m_lastScannedDeviceCount = scanned;
 	RefreshDeviceList();
+	if (m_aiMode && m_matches.empty())
+	{
+		CString noMatch;
+		noMatch.Format(Tr(TextId::AiNoDriverMatchFormat), scanned);
+		AppendLog(noMatch.GetString());
+		SetBusy(false);
+		ScheduleAiExit(5000);
+		return;
+	}
 	CString summary;
 	summary.Format(Tr(TextId::ScanSummaryFormat),
 		static_cast<unsigned>(m_matches.size()));
 	AppendLog(summary.GetString());
 	SetBusy(false);
+	if (m_aiMode)
+	{
+		m_aiCountdownActive = true;
+		AppendLog(Tr(TextId::AiInstallCountdown));
+		LASTINPUTINFO input = { sizeof(input) };
+		if (GetLastInputInfo(&input)) m_aiLastInputTick = input.dwTime;
+		SetTimer(AI_INSTALL_TIMER, 5000, nullptr);
+		SetTimer(AI_ACTIVITY_TIMER, 100, nullptr);
+	}
+}
+
+void CkitsuneDrvInstallerView::CancelAiCountdownForUserInput()
+{
+	if (!m_aiMode || !m_aiCountdownActive) return;
+	KillTimer(AI_INSTALL_TIMER);
+	KillTimer(AI_ACTIVITY_TIMER);
+	m_aiCountdownActive = false;
+	m_aiInteractionEnabled = true;
+	AppendLog(Tr(TextId::AiInstallCancelled));
+	UpdateInteractionState();
+}
+
+void CkitsuneDrvInstallerView::ScheduleAiExit(UINT delayMilliseconds)
+{
+	KillTimer(AI_EXIT_TIMER);
+	SetTimer(AI_EXIT_TIMER, delayMilliseconds, nullptr);
+}
+
+void CkitsuneDrvInstallerView::OnTimer(UINT_PTR timerId)
+{
+	if (timerId == AI_INSTALL_TIMER)
+	{
+		KillTimer(AI_INSTALL_TIMER);
+		KillTimer(AI_ACTIVITY_TIMER);
+		m_aiCountdownActive = false;
+		if (HasCheckedDrivers()) OnInstall();
+		else if (AfxGetMainWnd()) AfxGetMainWnd()->PostMessageW(WM_CLOSE);
+		return;
+	}
+	if (timerId == AI_ACTIVITY_TIMER)
+	{
+		LASTINPUTINFO input = { sizeof(input) };
+		const HWND foreground = ::GetForegroundWindow();
+		const HWND mainWindow = AfxGetMainWnd() ? AfxGetMainWnd()->GetSafeHwnd() : NULL;
+		const bool applicationForeground = foreground == mainWindow ||
+			(foreground != NULL && mainWindow != NULL && ::IsChild(mainWindow, foreground));
+		if (applicationForeground && GetLastInputInfo(&input) && input.dwTime != m_aiLastInputTick)
+			CancelAiCountdownForUserInput();
+		return;
+	}
+	if (timerId == AI_EXIT_TIMER)
+	{
+		KillTimer(AI_EXIT_TIMER);
+		if (AfxGetMainWnd()) AfxGetMainWnd()->PostMessageW(WM_CLOSE);
+		return;
+	}
+	CView::OnTimer(timerId);
 }
 
 void CkitsuneDrvInstallerView::RefreshDeviceList()
@@ -528,8 +622,15 @@ void CkitsuneDrvInstallerView::OnInstall()
 	AppendLog(summary.GetString());
 	SetBusy(false);
 	if (mainFrame) mainFrame->SetInstallationActive(false);
-	::MessageBoxW(GetSafeHwnd(), summary, Tr(TextId::InstallCompleteTitle),
-		MB_OK | (failed == 0 ? MB_ICONINFORMATION : MB_ICONWARNING));
+	if (m_aiMode)
+	{
+		ScheduleAiExit(3000);
+	}
+	else
+	{
+		::MessageBoxW(GetSafeHwnd(), summary, Tr(TextId::InstallCompleteTitle),
+			MB_OK | (failed == 0 ? MB_ICONINFORMATION : MB_ICONWARNING));
+	}
 }
 
 void CkitsuneDrvInstallerView::ApplyLanguage()

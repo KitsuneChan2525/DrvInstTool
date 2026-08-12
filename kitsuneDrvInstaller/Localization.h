@@ -78,6 +78,9 @@ enum class TextId
 	InstallSuccessCountFormat,
 	InstallFailureCountFormat,
 	RestartToApply,
+	AiInstallCountdown,
+	AiInstallCancelled,
+	AiNoDriverMatchFormat,
 	Count
 };
 

@@ -24,9 +24,15 @@ public:
 public:
 	virtual BOOL InitInstance();
 	virtual int ExitInstance();
+	virtual BOOL PreTranslateMessage(MSG* message);
+	bool IsAiMode() const { return m_aiMode; }
+	void SetInstallerView(CWnd* view) { m_installerView = view; }
+	void NotifyAiUserActivity();
 
 // 实现
 	BOOL  m_bHiColorIcons;
+	bool m_aiMode = false;
+	CWnd* m_installerView = nullptr;
 
 	virtual void PreLoadState();
 	virtual void LoadCustomState();

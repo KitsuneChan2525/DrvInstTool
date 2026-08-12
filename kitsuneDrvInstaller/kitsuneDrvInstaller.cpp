@@ -64,6 +64,35 @@ CkitsuneDrvInstallerApp theApp;
 
 namespace
 {
+	bool HasAiArgument()
+	{
+		int count = 0;
+		LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+		if (!arguments) return false;
+		bool found = false;
+		for (int index = 1; index < count; ++index)
+			if (_wcsicmp(arguments[index], L"/ai") == 0) { found = true; break; }
+		LocalFree(arguments);
+		return found;
+	}
+
+	void ShowTimedCompatibilityError(const std::wstring& message)
+	{
+		const DWORD started = GetTickCount();
+		using MessageBoxTimeoutProc = int (WINAPI*)(HWND, LPCWSTR, LPCWSTR, UINT, WORD, DWORD);
+		const HMODULE user32 = GetModuleHandleW(L"user32.dll");
+		const auto messageBoxTimeout = reinterpret_cast<MessageBoxTimeoutProc>(
+			GetProcAddress(user32, "MessageBoxTimeoutW"));
+		if (messageBoxTimeout)
+			messageBoxTimeout(nullptr, message.c_str(), Tr(TextId::UnsupportedSystemTitle),
+				MB_OK | MB_ICONERROR | MB_SETFOREGROUND, 0, 5000);
+		else
+			MessageBoxW(nullptr, message.c_str(), Tr(TextId::UnsupportedSystemTitle),
+				MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+		const DWORD elapsed = GetTickCount() - started;
+		if (elapsed < 5000) Sleep(5000 - elapsed);
+	}
+
 	std::wstring ProgramDataRoot()
 	{
 		wchar_t module[MAX_PATH] = {};
@@ -215,6 +244,7 @@ BOOL CkitsuneDrvInstallerApp::InitInstance()
 	InitCommonControlsEx(&InitCtrls);
 
 	CWinAppEx::InitInstance();
+	m_aiMode = HasAiArgument();
 	Localization::SetLanguage(Localization::DetectSystemLanguage());
 	if (RunSelfTestIfRequested()) return FALSE;
 	const std::wstring dataRoot = ProgramDataRoot();
@@ -224,8 +254,9 @@ BOOL CkitsuneDrvInstallerApp::InitInstance()
 		std::wstring compatibilityError;
 		if (!SystemCompatibility::ValidateDriverMedia(dataRoot, compatibilityError))
 		{
-			MessageBoxW(nullptr, compatibilityError.c_str(), Tr(TextId::UnsupportedSystemTitle),
-				MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+			if (m_aiMode) ShowTimedCompatibilityError(compatibilityError);
+			else MessageBoxW(nullptr, compatibilityError.c_str(), Tr(TextId::UnsupportedSystemTitle),
+					MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
 			return FALSE;
 		}
 	}
@@ -310,6 +341,29 @@ BOOL CkitsuneDrvInstallerApp::InitInstance()
 	pMainFrame->UpdateWindow();
 
 	return TRUE;
+}
+
+BOOL CkitsuneDrvInstallerApp::PreTranslateMessage(MSG* message)
+{
+	if (m_aiMode && m_pMainWnd && message)
+	{
+		const bool mouseInput = message->message >= WM_LBUTTONDOWN && message->message <= WM_XBUTTONDBLCLK;
+		const bool nonClientMouseInput = message->message >= WM_NCLBUTTONDOWN && message->message <= WM_NCXBUTTONDBLCLK;
+		const bool keyboardInput = message->message >= WM_KEYFIRST && message->message <= WM_KEYLAST;
+		const bool belongsToApplication = message->hwnd == m_pMainWnd->GetSafeHwnd() ||
+			(message->hwnd != nullptr && ::IsChild(m_pMainWnd->GetSafeHwnd(), message->hwnd));
+		if (belongsToApplication && (mouseInput || nonClientMouseInput || keyboardInput))
+			NotifyAiUserActivity();
+	}
+	return CWinAppEx::PreTranslateMessage(message);
+}
+
+void CkitsuneDrvInstallerApp::NotifyAiUserActivity()
+{
+	if (!m_aiMode) return;
+	CkitsuneDrvInstallerView* view =
+		DYNAMIC_DOWNCAST(CkitsuneDrvInstallerView, m_installerView);
+	if (view) view->CancelAiCountdownForUserInput();
 }
 
 int CkitsuneDrvInstallerApp::ExitInstance()

@@ -7,6 +7,7 @@ public:
 	CMainFrame() noexcept;
 	virtual ~CMainFrame();
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
+	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 	virtual void OnUpdateFrameMenu(HMENU hMenuAlt);
 	void CenterBeforeFirstShow();
 	void SetInstallationActive(bool active);

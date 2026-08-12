@@ -12,8 +12,10 @@ public:
 	CkitsuneDrvInstallerDoc* GetDocument() const;
 	virtual void OnDraw(CDC* pDC);
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
+	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 	virtual void OnInitialUpdate();
 	virtual ~CkitsuneDrvInstallerView();
+	void CancelAiCountdownForUserInput();
 
 #ifdef _DEBUG
 	virtual void AssertValid() const;
@@ -37,10 +39,17 @@ protected:
 	DriverCatalog m_catalog;
 	std::vector<DeviceMatch> m_matches;
 	bool m_busy = false;
+	bool m_aiMode = false;
+	bool m_aiCountdownActive = false;
+	bool m_aiInteractionEnabled = true;
+	int m_lastScannedDeviceCount = 0;
+	DWORD m_aiLastInputTick = 0;
 
 	void LayoutControls(int width, int height);
 	void AppendLog(const std::wstring& text);
 	void SetBusy(bool busy);
+	void UpdateInteractionState();
+	void ScheduleAiExit(UINT delayMilliseconds);
 	bool HasCheckedDrivers();
 	void UpdateInstallButtonState();
 	void RefreshDeviceList();
@@ -59,6 +68,7 @@ protected:
 	afx_msg void OnLanguageChanged();
 	afx_msg void OnDeviceItemChanged(NMHDR* notifyHeader, LRESULT* result);
 	afx_msg LRESULT OnAutoScan(WPARAM wParam, LPARAM lParam);
+	afx_msg void OnTimer(UINT_PTR timerId);
 	DECLARE_MESSAGE_MAP()
 };
 
