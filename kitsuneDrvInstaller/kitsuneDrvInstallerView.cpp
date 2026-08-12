@@ -83,6 +83,7 @@ BEGIN_MESSAGE_MAP(CkitsuneDrvInstallerView, CView)
 	ON_BN_CLICKED(IDC_SELECT_RECOMMENDED, &CkitsuneDrvInstallerView::OnSelectRecommended)
 	ON_BN_CLICKED(IDC_INSTALL, &CkitsuneDrvInstallerView::OnInstall)
 	ON_CBN_SELCHANGE(IDC_LANGUAGE, &CkitsuneDrvInstallerView::OnLanguageChanged)
+	ON_NOTIFY(LVN_ITEMCHANGED, IDC_DEVICE_LIST, &CkitsuneDrvInstallerView::OnDeviceItemChanged)
 	ON_MESSAGE(WM_AUTO_SCAN, &CkitsuneDrvInstallerView::OnAutoScan)
 END_MESSAGE_MAP()
 
@@ -114,6 +115,7 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 	m_scan.Create(L"", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, CRect(), this, IDC_SCAN);
 	m_selectRecommended.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_SELECT_RECOMMENDED);
 	m_install.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_INSTALL);
+	m_install.EnableWindow(FALSE);
 	m_devices.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | LVS_REPORT | LVS_SHOWSELALWAYS, CRect(), this, IDC_DEVICE_LIST);
 	m_devices.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER | LVS_EX_CHECKBOXES);
 	m_devices.InsertColumn(0, L"", LVCFMT_LEFT, 335);
@@ -256,6 +258,8 @@ void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
 	m_log.SetWindowTextW(existing);
 	m_log.SetSel(-1, -1);
 	m_log.SendMessageW(EM_SCROLLCARET, 0, 0);
+	m_log.LineScroll(m_log.GetLineCount());
+	m_log.SendMessageW(WM_VSCROLL, SB_BOTTOM, 0);
 	const std::wstring logDirectory = SystemDriversRoot();
 	CreateDirectoryW(logDirectory.c_str(), nullptr);
 	const std::wstring logPath = JoinPath(logDirectory, L"Install.log");
@@ -283,8 +287,29 @@ void CkitsuneDrvInstallerView::SetBusy(bool busy)
 	m_busy = busy;
 	m_scan.EnableWindow(!busy);
 	m_selectRecommended.EnableWindow(!busy && !m_matches.empty());
-	m_install.EnableWindow(!busy && !m_matches.empty());
+	UpdateInstallButtonState();
 	UpdateWindow();
+}
+
+bool CkitsuneDrvInstallerView::HasCheckedDrivers()
+{
+	for (int row = 0; row < m_devices.GetItemCount(); ++row)
+		if (m_devices.GetCheck(row)) return true;
+	return false;
+}
+
+void CkitsuneDrvInstallerView::UpdateInstallButtonState()
+{
+	m_install.EnableWindow(!m_busy && HasCheckedDrivers());
+}
+
+void CkitsuneDrvInstallerView::OnDeviceItemChanged(NMHDR* notifyHeader, LRESULT* result)
+{
+	const NMLISTVIEW* item = reinterpret_cast<NMLISTVIEW*>(notifyHeader);
+	if ((item->uChanged & LVIF_STATE) != 0 &&
+		((item->uOldState ^ item->uNewState) & LVIS_STATEIMAGEMASK) != 0)
+		UpdateInstallButtonState();
+	*result = 0;
 }
 
 void CkitsuneDrvInstallerView::OnScan()
@@ -347,6 +372,7 @@ void CkitsuneDrvInstallerView::RefreshDeviceList()
 		m_devices.SetItemText(row, 4, Tr(status));
 		m_devices.SetCheck(row, (match.needsDriver || match.updateAvailable) ? TRUE : FALSE);
 	}
+	UpdateInstallButtonState();
 }
 
 void CkitsuneDrvInstallerView::OnSelectRecommended()
@@ -356,6 +382,7 @@ void CkitsuneDrvInstallerView::OnSelectRecommended()
 		const DeviceMatch& match = m_matches[static_cast<size_t>(row)];
 		m_devices.SetCheck(row, (match.needsDriver || match.updateAvailable) ? TRUE : FALSE);
 	}
+	UpdateInstallButtonState();
 }
 
 void CkitsuneDrvInstallerView::OnInstall()
@@ -409,6 +436,7 @@ void CkitsuneDrvInstallerView::OnInstall()
 		m_progress.SetPos(static_cast<int>(position + 1));
 		PumpMessages();
 	}
+	UpdateInstallButtonState();
 	const int failed = static_cast<int>(selected.size()) - success;
 	CString successLine;
 	successLine.Format(Tr(TextId::InstallSuccessCountFormat), success);

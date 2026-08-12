@@ -40,6 +40,8 @@ protected:
 	void LayoutControls(int width, int height);
 	void AppendLog(const std::wstring& text);
 	void SetBusy(bool busy);
+	bool HasCheckedDrivers();
+	void UpdateInstallButtonState();
 	void RefreshDeviceList();
 	void UpdateTitle();
 	void ApplyLanguage();
@@ -54,6 +56,7 @@ protected:
 	afx_msg void OnSelectRecommended();
 	afx_msg void OnInstall();
 	afx_msg void OnLanguageChanged();
+	afx_msg void OnDeviceItemChanged(NMHDR* notifyHeader, LRESULT* result);
 	afx_msg LRESULT OnAutoScan(WPARAM wParam, LPARAM lParam);
 	DECLARE_MESSAGE_MAP()
 };
