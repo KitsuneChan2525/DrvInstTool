@@ -322,15 +322,20 @@ void CkitsuneDrvInstallerView::RefreshDeviceList()
 		m_devices.SetItemText(row, 2, match.driver.provider.c_str());
 		m_devices.SetItemText(row, 3, match.driver.driverVersion.c_str());
 		m_devices.SetItemText(row, 4, match.driver.driverDate.c_str());
-		m_devices.SetItemText(row, 5, match.needsDriver ? Tr(TextId::MissingDriver) : Tr(TextId::InstalledUpdate));
-		m_devices.SetCheck(row, match.needsDriver ? TRUE : FALSE);
+		const TextId status = match.needsDriver ? TextId::MissingDriver :
+			(match.updateAvailable ? TextId::InstalledUpdate : TextId::InstalledSuccess);
+		m_devices.SetItemText(row, 5, Tr(status));
+		m_devices.SetCheck(row, (match.needsDriver || match.updateAvailable) ? TRUE : FALSE);
 	}
 }
 
 void CkitsuneDrvInstallerView::OnSelectRecommended()
 {
 	for (int row = 0; row < m_devices.GetItemCount(); ++row)
-		m_devices.SetCheck(row, m_matches[static_cast<size_t>(row)].needsDriver ? TRUE : FALSE);
+	{
+		const DeviceMatch& match = m_matches[static_cast<size_t>(row)];
+		m_devices.SetCheck(row, (match.needsDriver || match.updateAvailable) ? TRUE : FALSE);
+	}
 }
 
 void CkitsuneDrvInstallerView::OnInstall()

@@ -6,6 +6,8 @@
 #include <newdev.h>
 #include <ShlObj.h>
 #include <algorithm>
+#include <climits>
+#include <cwctype>
 #include <fstream>
 #include <sstream>
 
@@ -453,6 +455,76 @@ namespace
 		return result;
 	}
 
+	std::wstring ReadDriverRegistryString(HDEVINFO set, SP_DEVINFO_DATA& device, const wchar_t* name)
+	{
+		HKEY key = SetupDiOpenDevRegKey(set, &device, DICS_FLAG_GLOBAL, 0, DIREG_DRV, KEY_QUERY_VALUE);
+		if (key == INVALID_HANDLE_VALUE) return {};
+		DWORD type = 0, bytes = 0;
+		LONG status = RegQueryValueExW(key, name, nullptr, &type, nullptr, &bytes);
+		std::wstring value;
+		if (status == ERROR_SUCCESS && (type == REG_SZ || type == REG_EXPAND_SZ) && bytes >= sizeof(wchar_t))
+		{
+			std::vector<wchar_t> buffer(bytes / sizeof(wchar_t) + 1, L'\0');
+			if (RegQueryValueExW(key, name, nullptr, &type,
+				reinterpret_cast<BYTE*>(buffer.data()), &bytes) == ERROR_SUCCESS)
+				value.assign(buffer.data());
+		}
+		RegCloseKey(key);
+		return value;
+	}
+
+	std::vector<unsigned long long> NumericParts(const std::wstring& value)
+	{
+		std::vector<unsigned long long> parts;
+		for (size_t index = 0; index < value.size();)
+		{
+			if (!iswdigit(value[index])) { ++index; continue; }
+			unsigned long long part = 0;
+			while (index < value.size() && iswdigit(value[index]))
+			{
+				const unsigned int digit = value[index++] - L'0';
+				part = part > (ULLONG_MAX - digit) / 10 ? ULLONG_MAX : part * 10 + digit;
+			}
+			parts.push_back(part);
+		}
+		return parts;
+	}
+
+	int CompareNumericParts(const std::wstring& left, const std::wstring& right)
+	{
+		const auto a = NumericParts(left);
+		const auto b = NumericParts(right);
+		const size_t count = max(a.size(), b.size());
+		for (size_t index = 0; index < count; ++index)
+		{
+			const unsigned long long av = index < a.size() ? a[index] : 0;
+			const unsigned long long bv = index < b.size() ? b[index] : 0;
+			if (av != bv) return av > bv ? 1 : -1;
+		}
+		return 0;
+	}
+
+	unsigned long long DateKey(const std::wstring& value)
+	{
+		const auto parts = NumericParts(value);
+		if (parts.size() < 3) return 0;
+		// Driver dates use month/day/year in both the index and Windows driver registry.
+		return parts[2] * 10000 + parts[0] * 100 + parts[1];
+	}
+
+	bool IsPackageNewer(const DriverPackage& package, const std::wstring& installedVersion,
+		const std::wstring& installedDate)
+	{
+		if (!package.driverVersion.empty() && !installedVersion.empty())
+		{
+			const int versionOrder = CompareNumericParts(package.driverVersion, installedVersion);
+			if (versionOrder != 0) return versionOrder > 0;
+		}
+		const unsigned long long packageDate = DateKey(package.driverDate);
+		const unsigned long long currentDate = DateKey(installedDate);
+		return packageDate != 0 && currentDate != 0 && packageDate > currentDate;
+	}
+
 	std::wstring Quote(const std::wstring& value)
 	{
 		return L"\"" + value + L"\"";
@@ -819,10 +891,51 @@ bool DeviceScanner::Scan(const DriverCatalog& catalog, std::vector<DeviceMatch>&
 		match.driver = package;
 		std::vector<BYTE> installedDriver;
 		match.needsDriver = !ReadRegistryProperty(set, device, SPDRP_DRIVER, installedDriver);
+		if (!match.needsDriver)
+		{
+			match.installedDriverVersion = ReadDriverRegistryString(set, device, L"DriverVersion");
+			match.installedDriverDate = ReadDriverRegistryString(set, device, L"DriverDate");
+			match.updateAvailable = IsPackageNewer(match.driver, match.installedDriverVersion,
+				match.installedDriverDate);
+		}
 		matches.push_back(match);
 	}
 	SetupDiDestroyDeviceInfoList(set);
 	return error.empty();
+}
+
+bool DeviceScanner::RunVersionComparisonTests(std::wstring& error)
+{
+	struct Case
+	{
+		const wchar_t* packageVersion;
+		const wchar_t* installedVersion;
+		const wchar_t* packageDate;
+		const wchar_t* installedDate;
+		bool expected;
+	};
+	const Case cases[] =
+	{
+		{ L"1.2.0.34", L"1.2.0.33", L"01/01/2020", L"01/01/2020", true },
+		{ L"1.2.001.0402", L"1.2.1.402", L"03/29/2015", L"03/28/2015", true },
+		{ L"8.782.0.0000", L"8.782.0.0", L"09/28/2010", L"09/28/2010", false },
+		{ L"2.0.0.0", L"3.0.0.0", L"12/31/2030", L"01/01/2020", false },
+		{ L"", L"", L"04/18/2020", L"04/17/2020", true }
+	};
+	for (const auto& item : cases)
+	{
+		DriverPackage package;
+		package.driverVersion = item.packageVersion;
+		package.driverDate = item.packageDate;
+		if (IsPackageNewer(package, item.installedVersion, item.installedDate) != item.expected)
+		{
+			error = std::wstring(L"Driver version comparison failed: ") + item.packageVersion +
+				L" / " + item.installedVersion;
+			return false;
+		}
+	}
+	error.clear();
+	return true;
 }
 
 std::wstring DriverInstaller::Find7Zip(const std::wstring& dataRoot)

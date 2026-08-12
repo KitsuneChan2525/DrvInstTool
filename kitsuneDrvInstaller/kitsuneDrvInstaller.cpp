@@ -100,6 +100,8 @@ namespace
 		std::wstring error;
 		std::wstring compatibilityError;
 		const bool compatibilityRulesOk = SystemCompatibility::RunRuleTests(compatibilityError);
+		std::wstring driverVersionError;
+		const bool driverVersionRulesOk = DeviceScanner::RunVersionComparisonTests(driverVersionError);
 		std::wstring mediaCompatibilityError;
 		const bool mediaCompatibilityOk = SystemCompatibility::ValidateDriverMedia(dataRoot, mediaCompatibilityError);
 		std::wstring mediaTargetSystem;
@@ -111,11 +113,20 @@ namespace
 		int scanned = 0;
 		bool scanOk = false;
 		if (catalogLoaded) scanOk = DeviceScanner::Scan(catalog, matches, scanned, error);
+		size_t missingDrivers = 0, updateDrivers = 0, installedDrivers = 0;
+		for (const auto& match : matches)
+		{
+			if (match.needsDriver) ++missingDrivers;
+			else if (match.updateAvailable) ++updateDrivers;
+			else ++installedDrivers;
+		}
 		const std::wstring sevenZip = DriverInstaller::Find7Zip(dataRoot);
 		std::ofstream report(reportPath, std::ios::binary | std::ios::trunc);
 		report << "{\n"
 			<< "  \"compatibility_rules_ok\": " << (compatibilityRulesOk ? "true" : "false") << ",\n"
 			<< "  \"compatibility_error\": \"" << JsonEscapeUtf8(compatibilityError) << "\",\n"
+			<< "  \"driver_version_rules_ok\": " << (driverVersionRulesOk ? "true" : "false") << ",\n"
+			<< "  \"driver_version_error\": \"" << JsonEscapeUtf8(driverVersionError) << "\",\n"
 			<< "  \"media_compatibility_ok\": " << (mediaCompatibilityOk ? "true" : "false") << ",\n"
 			<< "  \"media_compatibility_error\": \"" << JsonEscapeUtf8(mediaCompatibilityError) << "\",\n"
 			<< "  \"media_target_ok\": " << (mediaTargetOk ? "true" : "false") << ",\n"
@@ -127,6 +138,9 @@ namespace
 			<< "  \"device_scan_ok\": " << (scanOk ? "true" : "false") << ",\n"
 			<< "  \"scanned_device_count\": " << scanned << ",\n"
 			<< "  \"matched_device_count\": " << matches.size() << ",\n"
+			<< "  \"missing_driver_count\": " << missingDrivers << ",\n"
+			<< "  \"update_driver_count\": " << updateDrivers << ",\n"
+			<< "  \"installed_driver_count\": " << installedDrivers << ",\n"
 			<< "  \"seven_zip\": \"" << JsonEscapeUtf8(sevenZip) << "\",\n"
 			<< "  \"error\": \"" << JsonEscapeUtf8(error) << "\"\n"
 			<< "}\n";

@@ -26,7 +26,10 @@ struct DeviceMatch
 	std::wstring hardwareId;
 	std::wstring indexedDeviceName;
 	DriverPackage driver;
+	std::wstring installedDriverVersion;
+	std::wstring installedDriverDate;
 	bool needsDriver = false;
+	bool updateAvailable = false;
 };
 
 class DriverCatalog
@@ -54,6 +57,7 @@ class DeviceScanner
 public:
 	static bool Scan(const DriverCatalog& catalog, std::vector<DeviceMatch>& matches,
 		int& scannedDeviceCount, std::wstring& error);
+	static bool RunVersionComparisonTests(std::wstring& error);
 };
 
 class SystemCompatibility
