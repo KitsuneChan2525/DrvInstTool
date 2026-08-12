@@ -22,7 +22,6 @@ public:
 
 protected:
 	CStatic m_title;
-	CStatic m_subtitle;
 	CStatic m_languageLabel;
 	CComboBox m_language;
 	CStatic m_dataLabel;
@@ -37,7 +36,6 @@ protected:
 	CListCtrl m_devices;
 	CProgressCtrl m_progress;
 	CFont m_titleFont;
-	CFont m_subtitleFont;
 	DriverCatalog m_catalog;
 	std::vector<DeviceMatch> m_matches;
 	bool m_busy = false;
@@ -47,7 +45,6 @@ protected:
 	void SetBusy(bool busy, const wchar_t* status);
 	void RefreshDeviceList();
 	void UpdateTitle();
-	void UpdateSubtitle();
 	void ApplyLanguage();
 	std::wstring CurrentDataRoot() const;
 

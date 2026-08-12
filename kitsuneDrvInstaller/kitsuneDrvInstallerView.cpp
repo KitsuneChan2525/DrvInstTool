@@ -89,14 +89,9 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 
 	m_titleFont.CreateFontW(-28, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, 0, DEFAULT_CHARSET,
 		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei UI");
-	m_subtitleFont.CreateFontW(-15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, 0, DEFAULT_CHARSET,
-		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei UI");
-
 	Localization::SetLanguage(Localization::DetectSystemLanguage());
 	m_title.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
 	m_title.SetFont(&m_titleFont);
-	m_subtitle.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
-	m_subtitle.SetFont(&m_subtitleFont);
 	m_languageLabel.Create(L"", WS_CHILD | WS_VISIBLE | SS_RIGHT, CRect(), this);
 	m_language.Create(WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, CRect(), this, IDC_LANGUAGE);
 	m_language.AddString(L"English");
@@ -132,7 +127,6 @@ void CkitsuneDrvInstallerView::OnInitialUpdate()
 	const std::wstring dataRoot = ProgramDataRoot();
 	m_dataRoot.SetWindowTextW(dataRoot.c_str());
 	UpdateTitle();
-	UpdateSubtitle();
 	std::wstring compatibilityError;
 	if (FileExists(JoinPath(dataRoot, L"config.json")) &&
 		!SystemCompatibility::ValidateDriverMedia(dataRoot, compatibilityError))
@@ -163,25 +157,24 @@ void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 	const int margin = 22;
 	const int contentWidth = max(300, width - margin * 2);
 	m_title.MoveWindow(margin, 16, contentWidth, 34);
-	m_subtitle.MoveWindow(margin, 49, contentWidth, 22);
 	m_languageLabel.MoveWindow(width - margin - 270, 20, 90, 24);
 	m_language.MoveWindow(width - margin - 172, 17, 172, 220);
-	m_dataLabel.MoveWindow(margin, 82, 95, 24);
-	m_scan.MoveWindow(width - margin - 105, 78, 105, 30);
-	m_dataRoot.MoveWindow(margin + 100, 79, max(80, width - margin * 2 - 100 - 105 - 8), 28);
+	m_dataLabel.MoveWindow(margin, 58, 95, 24);
+	m_scan.MoveWindow(width - margin - 105, 54, 105, 30);
+	m_dataRoot.MoveWindow(margin + 100, 55, max(80, width - margin * 2 - 100 - 105 - 8), 28);
 
-	m_listLabel.MoveWindow(margin, 122, 190, 24);
-	m_install.MoveWindow(width - margin - 125, 116, 125, 31);
-	m_selectRecommended.MoveWindow(width - margin - 125 - 132, 116, 124, 31);
-	m_statusLabel.MoveWindow(margin + 200, 122, max(50, width - margin * 2 - 470), 23);
+	m_listLabel.MoveWindow(margin, 98, 190, 24);
+	m_install.MoveWindow(width - margin - 125, 92, 125, 31);
+	m_selectRecommended.MoveWindow(width - margin - 125 - 132, 92, 124, 31);
+	m_statusLabel.MoveWindow(margin + 200, 98, max(50, width - margin * 2 - 470), 23);
 
 	const int logHeight = 98;
 	const int bottomArea = 32 + 22 + logHeight + margin;
-	const int listHeight = max(100, height - 152 - bottomArea);
-	m_devices.MoveWindow(margin, 151, contentWidth, listHeight);
-	m_progress.MoveWindow(margin, 158 + listHeight, contentWidth, 17);
-	m_logLabel.MoveWindow(margin, 181 + listHeight, 100, 22);
-	m_log.MoveWindow(margin, 203 + listHeight, contentWidth, max(50, height - (203 + listHeight) - margin));
+	const int listHeight = max(100, height - 128 - bottomArea);
+	m_devices.MoveWindow(margin, 127, contentWidth, listHeight);
+	m_progress.MoveWindow(margin, 134 + listHeight, contentWidth, 17);
+	m_logLabel.MoveWindow(margin, 157 + listHeight, 100, 22);
+	m_log.MoveWindow(margin, 179 + listHeight, contentWidth, max(50, height - (179 + listHeight) - margin));
 }
 
 std::wstring CkitsuneDrvInstallerView::CurrentDataRoot() const
@@ -347,7 +340,6 @@ void CkitsuneDrvInstallerView::OnInstall()
 void CkitsuneDrvInstallerView::ApplyLanguage()
 {
 	UpdateTitle();
-	UpdateSubtitle();
 	m_languageLabel.SetWindowTextW(Tr(TextId::Language));
 	m_dataLabel.SetWindowTextW(Tr(TextId::DataDirectory));
 	m_scan.SetWindowTextW(Tr(TextId::ScanHardware));
@@ -379,18 +371,6 @@ void CkitsuneDrvInstallerView::UpdateTitle()
 	m_title.SetWindowTextW(title.c_str());
 	if (GetParentFrame()) GetParentFrame()->SetWindowTextW(title.c_str());
 	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(title.c_str());
-}
-
-void CkitsuneDrvInstallerView::UpdateSubtitle()
-{
-	std::wstring targetSystem;
-	std::wstring targetArchitecture;
-	if (SystemCompatibility::GetDriverMediaTarget(CurrentDataRoot(), targetSystem, targetArchitecture))
-	{
-		m_subtitle.SetWindowTextW((targetSystem + L" " + targetArchitecture).c_str());
-		return;
-	}
-	m_subtitle.SetWindowTextW(Tr(TextId::Subtitle));
 }
 
 void CkitsuneDrvInstallerView::OnLanguageChanged()
