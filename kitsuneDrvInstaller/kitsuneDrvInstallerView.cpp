@@ -102,17 +102,15 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 	m_language.SetFont(CFont::FromHandle(static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT))), FALSE);
 	if (!InitializeLanguageSelector()) return -1;
 	m_scan.Create(L"", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, CRect(), this, IDC_SCAN);
-	m_listLabel.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
 	m_selectRecommended.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_SELECT_RECOMMENDED);
 	m_install.Create(L"", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, CRect(), this, IDC_INSTALL);
 	m_devices.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | LVS_REPORT | LVS_SHOWSELALWAYS, CRect(), this, IDC_DEVICE_LIST);
 	m_devices.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER | LVS_EX_CHECKBOXES);
-	m_devices.InsertColumn(0, L"", LVCFMT_LEFT, 265);
-	m_devices.InsertColumn(1, L"", LVCFMT_LEFT, 80);
-	m_devices.InsertColumn(2, L"", LVCFMT_LEFT, 175);
+	m_devices.InsertColumn(0, L"", LVCFMT_LEFT, 335);
+	m_devices.InsertColumn(1, L"", LVCFMT_LEFT, 210);
+	m_devices.InsertColumn(2, L"", LVCFMT_LEFT, 165);
 	m_devices.InsertColumn(3, L"", LVCFMT_LEFT, 155);
-	m_devices.InsertColumn(4, L"", LVCFMT_LEFT, 150);
-	m_devices.InsertColumn(5, L"", LVCFMT_LEFT, 125);
+	m_devices.InsertColumn(4, L"", LVCFMT_LEFT, 135);
 	m_progress.Create(WS_CHILD | WS_VISIBLE | PBS_SMOOTH, CRect(), this, IDC_PROGRESS);
 	m_logLabel.Create(L"", WS_CHILD | WS_VISIBLE, CRect(), this);
 	m_log.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL,
@@ -184,21 +182,20 @@ void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 	m_language.SetWindowPos(nullptr, languageX, 17, languageWidth, 240,
 		SWP_NOZORDER | SWP_SHOWWINDOW);
 
-	// Section heading uses the full row; all three actions share the next row.
-	m_listLabel.MoveWindow(margin, 62, contentWidth, 24);
+	// All three actions share the row below the title.
 	const int scanWidth = 112;
 	const int selectWidth = 140;
 	const int installWidth = 140;
 	const int installX = width - margin - installWidth;
 	const int selectX = installX - gap - selectWidth;
 	const int scanX = selectX - gap - scanWidth;
-	m_scan.MoveWindow(scanX, 91, scanWidth, 32);
-	m_selectRecommended.MoveWindow(selectX, 91, selectWidth, 32);
-	m_install.MoveWindow(installX, 91, installWidth, 32);
+	m_scan.MoveWindow(scanX, 62, scanWidth, 32);
+	m_selectRecommended.MoveWindow(selectX, 62, selectWidth, 32);
+	m_install.MoveWindow(installX, 62, installWidth, 32);
 
 	// The device list receives all flexible vertical space. Progress and log
 	// areas stay anchored to the bottom for a stable layout at every size.
-	const int devicesTop = 134;
+	const int devicesTop = 105;
 	const int logHeight = max(96, min(150, height / 5));
 	const int logTop = height - margin - logHeight;
 	const int logLabelY = logTop - 25;
@@ -313,13 +310,12 @@ void CkitsuneDrvInstallerView::RefreshDeviceList()
 	{
 		const DeviceMatch& match = m_matches[i];
 		const int row = m_devices.InsertItem(static_cast<int>(i), match.displayName.c_str());
-		m_devices.SetItemText(row, 1, match.driver.category.c_str());
-		m_devices.SetItemText(row, 2, match.driver.provider.c_str());
-		m_devices.SetItemText(row, 3, match.driver.driverVersion.c_str());
-		m_devices.SetItemText(row, 4, match.driver.driverDate.c_str());
+		m_devices.SetItemText(row, 1, match.driver.provider.c_str());
+		m_devices.SetItemText(row, 2, match.driver.driverVersion.c_str());
+		m_devices.SetItemText(row, 3, match.driver.driverDate.c_str());
 		const TextId status = match.needsDriver ? TextId::MissingDriver :
 			(match.updateAvailable ? TextId::InstalledUpdate : TextId::InstalledSuccess);
-		m_devices.SetItemText(row, 5, Tr(status));
+		m_devices.SetItemText(row, 4, Tr(status));
 		m_devices.SetCheck(row, (match.needsDriver || match.updateAvailable) ? TRUE : FALSE);
 	}
 }
@@ -375,13 +371,13 @@ void CkitsuneDrvInstallerView::OnInstall()
 		{
 			++success;
 			anyReboot = anyReboot || reboot;
-			m_devices.SetItemText(row, 5, reboot ? Tr(TextId::InstalledReboot) : Tr(TextId::InstalledSuccess));
+			m_devices.SetItemText(row, 4, reboot ? Tr(TextId::InstalledReboot) : Tr(TextId::InstalledSuccess));
 			m_devices.SetCheck(row, FALSE);
 			AppendLog(std::wstring(Tr(TextId::InstallSuccessLog)) + match.displayName);
 		}
 		else
 		{
-			m_devices.SetItemText(row, 5, Tr(TextId::InstallFailedStatus));
+			m_devices.SetItemText(row, 4, Tr(TextId::InstallFailedStatus));
 			AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + error);
 		}
 		m_progress.SetPos(static_cast<int>(position + 1));
@@ -399,11 +395,10 @@ void CkitsuneDrvInstallerView::ApplyLanguage()
 	UpdateTitle();
 	m_languageLabel.SetWindowTextW(Tr(TextId::Language));
 	m_scan.SetWindowTextW(Tr(TextId::ScanHardware));
-	m_listLabel.SetWindowTextW(Tr(TextId::MatchedDevices));
 	m_selectRecommended.SetWindowTextW(Tr(TextId::SelectMissing));
 	m_install.SetWindowTextW(Tr(TextId::InstallSelected));
 	m_logLabel.SetWindowTextW(Tr(TextId::OperationLog));
-	const TextId columns[] = { TextId::ColumnDevice, TextId::ColumnCategory, TextId::ColumnProvider,
+	const TextId columns[] = { TextId::ColumnDevice, TextId::ColumnProvider,
 		TextId::ColumnVersion, TextId::ColumnDate, TextId::ColumnStatus };
 	for (int index = 0; index < _countof(columns); ++index)
 	{

@@ -116,8 +116,10 @@ namespace
 		bool scanOk = false;
 		if (catalogLoaded) scanOk = DeviceScanner::Scan(catalog, matches, scanned, error);
 		size_t missingDrivers = 0, updateDrivers = 0, installedDrivers = 0;
+		size_t systemBuiltInDrivers = 0;
 		for (const auto& match : matches)
 		{
+			if (match.usesSystemBuiltInDriver) ++systemBuiltInDrivers;
 			if (match.needsDriver) ++missingDrivers;
 			else if (match.updateAvailable) ++updateDrivers;
 			else ++installedDrivers;
@@ -157,6 +159,7 @@ namespace
 			<< "  \"missing_driver_count\": " << missingDrivers << ",\n"
 			<< "  \"update_driver_count\": " << updateDrivers << ",\n"
 			<< "  \"installed_driver_count\": " << installedDrivers << ",\n"
+			<< "  \"system_builtin_driver_count\": " << systemBuiltInDrivers << ",\n"
 			<< "  \"indexed_name_fallback_count\": " << indexedNameFallbackCount << ",\n"
 			<< "  \"ambiguous_bluetooth_profile_match_count\": " << ambiguousBluetoothProfileMatches << ",\n"
 			<< "  \"matches\": [\n";
@@ -168,7 +171,8 @@ namespace
 				<< "\", \"driver_id\": \"" << JsonEscapeUtf8(match.driver.id)
 				<< "\", \"provider\": \"" << JsonEscapeUtf8(match.driver.provider)
 				<< "\", \"installed_provider\": \"" << JsonEscapeUtf8(match.installedDriverProvider)
-				<< "\", \"uses_indexed_name\": " <<
+				<< "\", \"system_builtin_driver\": " << (match.usesSystemBuiltInDriver ? "true" : "false")
+				<< ", \"uses_indexed_name\": " <<
 					(!match.indexedDeviceName.empty() && match.displayName == match.indexedDeviceName ? "true" : "false")
 				<< ", \"device_class\": \"" << JsonEscapeUtf8(match.driver.deviceClass)
 				<< "\"}" << (index + 1 < matches.size() ? "," : "") << "\n";

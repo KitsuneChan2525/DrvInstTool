@@ -539,6 +539,13 @@ namespace
 			value.find(L"PCI\\CC_") == 0;
 	}
 
+	bool IsSystemBuiltInDriver(const std::wstring& provider, const std::wstring& infName)
+	{
+		if (SameText(provider, L"Microsoft")) return true;
+		const std::wstring fileName = FileNamePart(infName);
+		return !fileName.empty() && fileName.find(L"OEM") != 0;
+	}
+
 	std::wstring ReadDriverRegistryString(HDEVINFO set, SP_DEVINFO_DATA& device, const wchar_t* name)
 	{
 		HKEY key = SetupDiOpenDevRegKey(set, &device, DICS_FLAG_GLOBAL, 0, DIREG_DRV, KEY_QUERY_VALUE);
@@ -1067,14 +1074,15 @@ bool DeviceScanner::Scan(const DriverCatalog& catalog, std::vector<DeviceMatch>&
 		wchar_t instanceId[4096] = {};
 		if (SetupDiGetDeviceInstanceIdW(set, &device, instanceId, _countof(instanceId), nullptr)) match.instanceId = instanceId;
 		std::vector<BYTE> installedDriver;
-		match.needsDriver = !ReadRegistryProperty(set, device, SPDRP_DRIVER, installedDriver);
-		match.installedDriverProvider = match.needsDriver ? std::wstring() :
+		const bool hasInstalledDriver = ReadRegistryProperty(set, device, SPDRP_DRIVER, installedDriver);
+		match.installedDriverProvider = !hasInstalledDriver ? std::wstring() :
 			ReadDriverRegistryString(set, device, L"ProviderName");
-		const bool usesGenericDriver = !match.needsDriver &&
-			SameText(match.installedDriverProvider, L"Microsoft");
-		const bool providerChanged = !match.needsDriver &&
+		match.usesSystemBuiltInDriver = hasInstalledDriver &&
+			IsSystemBuiltInDriver(match.installedDriverProvider, matchContext.currentInfName);
+		match.needsDriver = !hasInstalledDriver || match.usesSystemBuiltInDriver;
+		const bool providerChanged = hasInstalledDriver &&
 			!SameText(match.installedDriverProvider, package.provider);
-		if ((match.needsDriver || usesGenericDriver || providerChanged) && !indexedName.empty())
+		if ((match.needsDriver || providerChanged) && !indexedName.empty())
 			match.displayName = indexedName;
 		else
 		{
@@ -1085,7 +1093,7 @@ bool DeviceScanner::Scan(const DriverCatalog& catalog, std::vector<DeviceMatch>&
 		match.hardwareId = matchedId;
 		match.indexedDeviceName = indexedName;
 		match.driver = package;
-		if (!match.needsDriver)
+		if (hasInstalledDriver && !match.usesSystemBuiltInDriver)
 		{
 			match.installedDriverVersion = ReadDriverRegistryString(set, device, L"DriverVersion");
 			match.installedDriverDate = ReadDriverRegistryString(set, device, L"DriverDate");
@@ -1127,6 +1135,13 @@ bool DeviceScanner::RunVersionComparisonTests(std::wstring& error)
 				L" / " + item.installedVersion;
 			return false;
 		}
+	}
+	if (!IsSystemBuiltInDriver(L"Microsoft", L"oem42.inf") ||
+		!IsSystemBuiltInDriver(L"Intel", L"display.inf") ||
+		IsSystemBuiltInDriver(L"Intel", L"oem42.inf"))
+	{
+		error = L"System built-in driver detection failed";
+		return false;
 	}
 	error.clear();
 	return true;

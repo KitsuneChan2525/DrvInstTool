@@ -24,7 +24,6 @@ protected:
 	CStatic m_title;
 	CStatic m_languageLabel;
 	CComboBox m_language;
-	CStatic m_listLabel;
 	CStatic m_logLabel;
 	CEdit m_log;
 	CButton m_scan;

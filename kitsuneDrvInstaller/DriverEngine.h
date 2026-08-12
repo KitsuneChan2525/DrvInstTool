@@ -30,6 +30,7 @@ struct DeviceMatch
 	std::wstring installedDriverVersion;
 	std::wstring installedDriverDate;
 	bool needsDriver = false;
+	bool usesSystemBuiltInDriver = false;
 	bool updateAvailable = false;
 };
 
