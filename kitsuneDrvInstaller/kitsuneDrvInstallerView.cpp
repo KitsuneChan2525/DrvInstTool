@@ -131,9 +131,8 @@ void CkitsuneDrvInstallerView::OnInitialUpdate()
 	CView::OnInitialUpdate();
 	const std::wstring dataRoot = ProgramDataRoot();
 	m_dataRoot.SetWindowTextW(dataRoot.c_str());
+	UpdateTitle();
 	UpdateSubtitle();
-	if (GetParentFrame()) GetParentFrame()->SetWindowTextW(Tr(TextId::ViewTitle));
-	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(Tr(TextId::AppTitle));
 	std::wstring compatibilityError;
 	if (FileExists(JoinPath(dataRoot, L"config.json")) &&
 		!SystemCompatibility::ValidateDriverMedia(dataRoot, compatibilityError))
@@ -347,7 +346,7 @@ void CkitsuneDrvInstallerView::OnInstall()
 
 void CkitsuneDrvInstallerView::ApplyLanguage()
 {
-	m_title.SetWindowTextW(Tr(TextId::AppTitle));
+	UpdateTitle();
 	UpdateSubtitle();
 	m_languageLabel.SetWindowTextW(Tr(TextId::Language));
 	m_dataLabel.SetWindowTextW(Tr(TextId::DataDirectory));
@@ -366,10 +365,20 @@ void CkitsuneDrvInstallerView::ApplyLanguage()
 		column.pszText = const_cast<LPWSTR>(Tr(columns[index]));
 		m_devices.SetColumn(index, &column);
 	}
-	if (GetParentFrame()) GetParentFrame()->SetWindowTextW(Tr(TextId::ViewTitle));
-	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(Tr(TextId::AppTitle));
 	if (!m_matches.empty()) RefreshDeviceList();
 	Invalidate();
+}
+
+void CkitsuneDrvInstallerView::UpdateTitle()
+{
+	std::wstring targetSystem;
+	std::wstring targetArchitecture;
+	std::wstring title = L"kitsune Driver Installer - [Unknown]";
+	if (SystemCompatibility::GetDriverMediaTarget(CurrentDataRoot(), targetSystem, targetArchitecture))
+		title = L"kitsune Driver Installer - [" + targetSystem + L" " + targetArchitecture + L"]";
+	m_title.SetWindowTextW(title.c_str());
+	if (GetParentFrame()) GetParentFrame()->SetWindowTextW(title.c_str());
+	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(title.c_str());
 }
 
 void CkitsuneDrvInstallerView::UpdateSubtitle()

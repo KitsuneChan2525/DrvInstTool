@@ -46,6 +46,7 @@ protected:
 	void AppendLog(const std::wstring& text);
 	void SetBusy(bool busy, const wchar_t* status);
 	void RefreshDeviceList();
+	void UpdateTitle();
 	void UpdateSubtitle();
 	void ApplyLanguage();
 	std::wstring CurrentDataRoot() const;
