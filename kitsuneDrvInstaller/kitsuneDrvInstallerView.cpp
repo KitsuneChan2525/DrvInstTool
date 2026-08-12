@@ -27,7 +27,6 @@ namespace
 	constexpr UINT WM_AUTO_SCAN = WM_APP + 1;
 	constexpr UINT_PTR AI_INSTALL_TIMER = 2;
 	constexpr UINT_PTR AI_EXIT_TIMER = 3;
-	constexpr UINT_PTR AI_ACTIVITY_TIMER = 4;
 
 	bool FileExists(const std::wstring& path)
 	{
@@ -372,13 +371,17 @@ void CkitsuneDrvInstallerView::SetBusy(bool busy)
 void CkitsuneDrvInstallerView::UpdateInteractionState()
 {
 	const bool enabled = !m_busy && (!m_aiMode || m_aiInteractionEnabled);
-	m_language.EnableWindow(enabled);
+	// Language and driver selection remain available during the /ai countdown.
+	// Both are disabled only while scanning/installing is actually busy.
+	m_language.EnableWindow(!m_busy);
 	// Keep driver check boxes available during the /ai countdown so the user
 	// can adjust the installation set. Actual installation still locks the list.
 	m_devices.EnableWindow(!m_busy);
 	m_scan.EnableWindow(enabled);
 	m_selectRecommended.EnableWindow(enabled && !m_matches.empty());
-	m_install.EnableWindow(enabled && HasCheckedDrivers());
+	const bool installAvailable = !m_busy && HasCheckedDrivers() &&
+		(!m_aiMode || m_aiInteractionEnabled || m_aiCountdownActive);
+	m_install.EnableWindow(installAvailable);
 }
 
 bool CkitsuneDrvInstallerView::HasCheckedDrivers()
@@ -467,10 +470,8 @@ void CkitsuneDrvInstallerView::OnScan()
 	{
 		m_aiCountdownActive = true;
 		AppendLog(Tr(TextId::AiInstallCountdown));
-		LASTINPUTINFO input = { sizeof(input) };
-		if (GetLastInputInfo(&input)) m_aiLastInputTick = input.dwTime;
 		SetTimer(AI_INSTALL_TIMER, 5000, nullptr);
-		SetTimer(AI_ACTIVITY_TIMER, 100, nullptr);
+		UpdateInteractionState();
 	}
 }
 
@@ -478,7 +479,6 @@ void CkitsuneDrvInstallerView::CancelAiCountdownForUserInput()
 {
 	if (!m_aiMode || !m_aiCountdownActive) return;
 	KillTimer(AI_INSTALL_TIMER);
-	KillTimer(AI_ACTIVITY_TIMER);
 	m_aiCountdownActive = false;
 	m_aiInteractionEnabled = true;
 	AppendLog(Tr(TextId::AiInstallCancelled));
@@ -496,21 +496,9 @@ void CkitsuneDrvInstallerView::OnTimer(UINT_PTR timerId)
 	if (timerId == AI_INSTALL_TIMER)
 	{
 		KillTimer(AI_INSTALL_TIMER);
-		KillTimer(AI_ACTIVITY_TIMER);
 		m_aiCountdownActive = false;
 		if (HasCheckedDrivers()) OnInstall();
 		else if (AfxGetMainWnd()) AfxGetMainWnd()->PostMessageW(WM_CLOSE);
-		return;
-	}
-	if (timerId == AI_ACTIVITY_TIMER)
-	{
-		LASTINPUTINFO input = { sizeof(input) };
-		const HWND foreground = ::GetForegroundWindow();
-		const HWND mainWindow = AfxGetMainWnd() ? AfxGetMainWnd()->GetSafeHwnd() : NULL;
-		const bool applicationForeground = foreground == mainWindow ||
-			(foreground != NULL && mainWindow != NULL && ::IsChild(mainWindow, foreground));
-		if (applicationForeground && GetLastInputInfo(&input) && input.dwTime != m_aiLastInputTick)
-			CancelAiCountdownForUserInput();
 		return;
 	}
 	if (timerId == AI_EXIT_TIMER)
@@ -553,6 +541,11 @@ void CkitsuneDrvInstallerView::OnSelectRecommended()
 void CkitsuneDrvInstallerView::OnInstall()
 {
 	if (m_busy) return;
+	if (m_aiCountdownActive)
+	{
+		KillTimer(AI_INSTALL_TIMER);
+		m_aiCountdownActive = false;
+	}
 	std::vector<int> selected;
 	for (int row = 0; row < m_devices.GetItemCount(); ++row)
 		if (m_devices.GetCheck(row)) selected.push_back(row);
@@ -665,6 +658,7 @@ void CkitsuneDrvInstallerView::UpdateTitle()
 
 void CkitsuneDrvInstallerView::OnLanguageChanged()
 {
+	CancelAiCountdownForUserInput();
 	if (m_busy) return;
 	const int selection = m_language.GetCurSel();
 	if (selection < 0 || selection > 2) return;

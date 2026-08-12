@@ -43,7 +43,6 @@ protected:
 	bool m_aiCountdownActive = false;
 	bool m_aiInteractionEnabled = true;
 	int m_lastScannedDeviceCount = 0;
-	DWORD m_aiLastInputTick = 0;
 
 	void LayoutControls(int width, int height);
 	void AppendLog(const std::wstring& text);
