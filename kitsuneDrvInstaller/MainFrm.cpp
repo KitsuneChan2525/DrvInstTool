@@ -25,10 +25,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
 END_MESSAGE_MAP()
 
 CMainFrame::CMainFrame() noexcept {}
-CMainFrame::~CMainFrame()
-{
-	if (m_blankCaptionIcon != nullptr) DestroyIcon(m_blankCaptionIcon);
-}
+CMainFrame::~CMainFrame() = default;
 
 int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 {
@@ -49,17 +46,15 @@ int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 	EnableMDITabs(FALSE);
 	CMFCVisualManager::SetDefaultManager(RUNTIME_CLASS(CMFCVisualManagerWindows));
 	SetWindowTextW(Tr(TextId::AppTitle));
-	// MFC restores IDR_MAINFRAME after creating the frame. Install a fully
-	// transparent icon for both caption sizes and reject later replacements.
-	// This removes the visible MFC cube icon without removing the close button.
-	const BYTE andMask[] = { 0xFF, 0xFF, 0xFF, 0xFF };
-	const BYTE xorMask[] = { 0x00, 0x00, 0x00, 0x00 };
-	m_blankCaptionIcon = CreateIcon(AfxGetInstanceHandle(), 1, 1, 1, 1, andMask, xorMask);
-	if (m_blankCaptionIcon != nullptr)
-	{
-		DefWindowProcW(WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(m_blankCaptionIcon));
-		DefWindowProcW(WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(m_blankCaptionIcon));
-	}
+	// Remove both per-window and class fallback icons. Together with
+	// WS_EX_DLGMODALFRAME this removes the caption icon slot itself instead of
+	// merely painting a transparent icon inside the reserved space.
+	DefWindowProcW(WM_SETICON, ICON_BIG, 0);
+	DefWindowProcW(WM_SETICON, ICON_SMALL, 0);
+	SetClassLongPtrW(GetSafeHwnd(), GCLP_HICON, 0);
+	SetClassLongPtrW(GetSafeHwnd(), GCLP_HICONSM, 0);
+	SetWindowPos(nullptr, 0, 0, 0, 0,
+		SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 	if (CMenu* systemMenu = GetSystemMenu(FALSE))
 	{
 		systemMenu->DeleteMenu(SC_SIZE, MF_BYCOMMAND);
@@ -94,10 +89,9 @@ LRESULT CMainFrame::OnSetMessageString(WPARAM wParam, LPARAM lParam)
 
 LRESULT CMainFrame::OnSetIcon(WPARAM wParam, LPARAM)
 {
-	// LoadFrame and shell integration can reapply the resource icon after
-	// OnCreate; always retain the transparent caption icon instead.
-	return m_blankCaptionIcon == nullptr ? 0 :
-		DefWindowProcW(WM_SETICON, wParam, reinterpret_cast<LPARAM>(m_blankCaptionIcon));
+	// LoadFrame and shell integration can reapply IDR_MAINFRAME after OnCreate.
+	// Keep the corresponding window icon empty and reject the supplied handle.
+	return DefWindowProcW(WM_SETICON, wParam, 0);
 }
 
 void CMainFrame::OnTimer(UINT_PTR timerId)

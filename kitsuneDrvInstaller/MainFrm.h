@@ -21,7 +21,6 @@ protected:
 	bool m_firstShowCentered = false;
 	bool m_fixedSizeActive = false;
 	bool m_installationActive = false;
-	HICON m_blankCaptionIcon = nullptr;
 	CSize m_fixedWindowSize;
 	CMFCStatusBar m_statusBar;
 	afx_msg int OnCreate(LPCREATESTRUCT createStruct);
