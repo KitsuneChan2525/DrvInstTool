@@ -34,6 +34,7 @@ protected:
 	CListCtrl m_devices;
 	CProgressCtrl m_progress;
 	CFont m_titleFont;
+	CBrush m_backgroundBrush;
 	DriverCatalog m_catalog;
 	std::vector<DeviceMatch> m_matches;
 	bool m_busy = false;
@@ -49,6 +50,7 @@ protected:
 	afx_msg int OnCreate(LPCREATESTRUCT createStruct);
 	afx_msg void OnSize(UINT type, int cx, int cy);
 	afx_msg BOOL OnEraseBkgnd(CDC* dc);
+	afx_msg HBRUSH OnCtlColor(CDC* dc, CWnd* window, UINT controlColor);
 	afx_msg void OnScan();
 	afx_msg void OnSelectRecommended();
 	afx_msg void OnInstall();

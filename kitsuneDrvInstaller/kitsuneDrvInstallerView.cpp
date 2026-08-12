@@ -11,6 +11,8 @@
 
 namespace
 {
+	constexpr COLORREF ViewBackgroundColor = RGB(245, 247, 250);
+
 	enum ControlId
 	{
 		IDC_SCAN = 2003,
@@ -67,6 +69,7 @@ BEGIN_MESSAGE_MAP(CkitsuneDrvInstallerView, CView)
 	ON_WM_CREATE()
 	ON_WM_SIZE()
 	ON_WM_ERASEBKGND()
+	ON_WM_CTLCOLOR()
 	ON_BN_CLICKED(IDC_SCAN, &CkitsuneDrvInstallerView::OnScan)
 	ON_BN_CLICKED(IDC_SELECT_RECOMMENDED, &CkitsuneDrvInstallerView::OnSelectRecommended)
 	ON_BN_CLICKED(IDC_INSTALL, &CkitsuneDrvInstallerView::OnInstall)
@@ -85,6 +88,7 @@ BOOL CkitsuneDrvInstallerView::PreCreateWindow(CREATESTRUCT& cs)
 int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 {
 	if (CView::OnCreate(createStruct) == -1) return -1;
+	if (!m_backgroundBrush.CreateSolidBrush(ViewBackgroundColor)) return -1;
 
 	m_titleFont.CreateFontW(-28, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, 0, DEFAULT_CHARSET,
 		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei UI");
@@ -138,8 +142,19 @@ BOOL CkitsuneDrvInstallerView::OnEraseBkgnd(CDC* dc)
 {
 	CRect rect;
 	GetClientRect(&rect);
-	dc->FillSolidRect(rect, RGB(245, 247, 250));
+	dc->FillSolidRect(rect, ViewBackgroundColor);
 	return TRUE;
+}
+
+HBRUSH CkitsuneDrvInstallerView::OnCtlColor(CDC* dc, CWnd* window, UINT controlColor)
+{
+	HBRUSH brush = CView::OnCtlColor(dc, window, controlColor);
+	if (controlColor == CTLCOLOR_STATIC)
+	{
+		dc->SetBkMode(TRANSPARENT);
+		return static_cast<HBRUSH>(m_backgroundBrush.GetSafeHandle());
+	}
+	return brush;
 }
 
 void CkitsuneDrvInstallerView::OnSize(UINT type, int cx, int cy)
