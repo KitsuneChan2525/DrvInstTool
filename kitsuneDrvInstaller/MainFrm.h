@@ -29,6 +29,8 @@ protected:
 	afx_msg void OnClose();
 	afx_msg BOOL OnQueryEndSession();
 	afx_msg void OnAppExit();
+	afx_msg LRESULT OnSetMessageString(WPARAM wParam, LPARAM lParam);
+	afx_msg void OnTimer(UINT_PTR timerId);
 	afx_msg void OnWindowPosChanging(WINDOWPOS* position);
 	DECLARE_MESSAGE_MAP()
 };

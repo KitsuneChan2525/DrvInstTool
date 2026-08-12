@@ -18,6 +18,8 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
 	ON_WM_CLOSE()
 	ON_WM_QUERYENDSESSION()
 	ON_COMMAND(ID_APP_EXIT, &CMainFrame::OnAppExit)
+	ON_MESSAGE(WM_SETMESSAGESTRING, &CMainFrame::OnSetMessageString)
+	ON_WM_TIMER()
 	ON_WM_WINDOWPOSCHANGING()
 END_MESSAGE_MAP()
 
@@ -27,14 +29,13 @@ CMainFrame::~CMainFrame() = default;
 int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 {
 	if (CMDIFrameWndEx::OnCreate(createStruct) == -1) return -1;
-	// Use a dedicated pane ID. ID_SEPARATOR is MFC's idle-message pane and
-	// would overwrite our version text with the localized "Ready" message.
-	static const UINT statusIndicators[] = { ID_STATUSBAR_PANE1 };
+	static const UINT statusIndicators[] = { ID_SEPARATOR };
 	if (!m_statusBar.Create(this) ||
 		!m_statusBar.SetIndicators(statusIndicators, _countof(statusIndicators)))
 		return -1;
 	m_statusBar.SetPaneStyle(0, SBPS_STRETCH | SBPS_NOBORDERS);
 	RefreshVersionStatus();
+	SetTimer(1, 250, nullptr);
 	// Keep the resource menu owned by MFC, but detach it while the frame is
 	// still hidden. This avoids both a first-frame flash and an invalid menu
 	// handle during later MDI updates/shutdown.
@@ -55,7 +56,8 @@ int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 
 void CMainFrame::RefreshVersionStatus()
 {
-	CString text = L"kitsune Driver Installer ";
+	if (!m_statusBar.GetSafeHwnd()) return;
+	CString text = L"kitsune Driver Installer - ";
 	switch (Localization::GetLanguage())
 	{
 	case UiLanguage::ChineseSimplified: text += L"版本："; break;
@@ -63,7 +65,22 @@ void CMainFrame::RefreshVersionStatus()
 	default: text += L"Version: "; break;
 	}
 	text += APP_FILE_VERSION_WSTRING;
-	m_statusBar.SetPaneText(0, text);
+	CString current;
+	m_statusBar.GetPaneText(0, current);
+	if (current != text) m_statusBar.SetPaneText(0, text);
+}
+
+LRESULT CMainFrame::OnSetMessageString(WPARAM wParam, LPARAM lParam)
+{
+	const LRESULT result = CMDIFrameWndEx::OnSetMessageString(wParam, lParam);
+	RefreshVersionStatus();
+	return result;
+}
+
+void CMainFrame::OnTimer(UINT_PTR timerId)
+{
+	if (timerId == 1) RefreshVersionStatus();
+	CMDIFrameWndEx::OnTimer(timerId);
 }
 
 void CMainFrame::OnUpdateFrameMenu(HMENU /*hMenuAlt*/)
