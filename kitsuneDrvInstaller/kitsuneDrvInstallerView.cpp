@@ -369,7 +369,6 @@ void CkitsuneDrvInstallerView::UpdateTitle()
 	if (SystemCompatibility::GetDriverMediaTarget(CurrentDataRoot(), targetSystem, targetArchitecture))
 		title = L"kitsune Driver Installer - [" + targetSystem + L" " + targetArchitecture + L"]";
 	m_title.SetWindowTextW(title.c_str());
-	if (GetParentFrame()) GetParentFrame()->SetWindowTextW(title.c_str());
 	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(title.c_str());
 }
 

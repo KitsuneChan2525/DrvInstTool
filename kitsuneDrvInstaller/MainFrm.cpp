@@ -48,6 +48,9 @@ void CMainFrame::OnUpdateFrameMenu(HMENU /*hMenuAlt*/)
 BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 {
 	if (!CMDIFrameWndEx::PreCreateWindow(cs)) return FALSE;
+	// The installer supplies its complete title. Do not let the MDI framework
+	// append the active child/document title a second time.
+	cs.style &= ~FWS_ADDTOTITLE;
 	cs.cx = 1180;
 	cs.cy = 780;
 	cs.style |= WS_MAXIMIZE;
