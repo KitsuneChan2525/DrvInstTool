@@ -27,7 +27,9 @@ CMainFrame::~CMainFrame() = default;
 int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 {
 	if (CMDIFrameWndEx::OnCreate(createStruct) == -1) return -1;
-	static const UINT statusIndicators[] = { ID_SEPARATOR };
+	// Use a dedicated pane ID. ID_SEPARATOR is MFC's idle-message pane and
+	// would overwrite our version text with the localized "Ready" message.
+	static const UINT statusIndicators[] = { ID_STATUSBAR_PANE1 };
 	if (!m_statusBar.Create(this) ||
 		!m_statusBar.SetIndicators(statusIndicators, _countof(statusIndicators)))
 		return -1;
