@@ -570,7 +570,7 @@ namespace
 		const std::wstring os = Upper(targetOs);
 		if (os == L"WINVISTA") return L"Windows Vista Service Pack 2";
 		if (os == L"WIN7") return L"Windows 7 Service Pack 1";
-		if (os == L"WIN8") return L"Windows 8 / Windows 8.1";
+		if (os == L"WIN8") return L"Windows 8.x";
 		if (os == L"WIN10")
 		{
 			switch (Localization::GetLanguage())
@@ -588,7 +588,7 @@ namespace
 		const std::wstring os = Upper(targetOs);
 		if (os == L"WINVISTA") return L"Windows Vista";
 		if (os == L"WIN7") return L"Windows 7";
-		if (os == L"WIN8") return L"Windows 8 / Windows 8.1";
+		if (os == L"WIN8") return L"Windows 8.x";
 		if (os == L"WIN10") return L"Windows 10";
 		return {};
 	}
