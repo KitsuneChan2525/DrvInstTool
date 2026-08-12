@@ -53,8 +53,24 @@ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 	cs.style &= ~FWS_ADDTOTITLE;
 	cs.cx = 1180;
 	cs.cy = 780;
-	cs.style |= WS_MAXIMIZE;
+	cs.style &= ~WS_MAXIMIZE;
 	return TRUE;
+}
+
+void CMainFrame::CenterOnCurrentScreen()
+{
+	POINT cursor = {};
+	GetCursorPos(&cursor);
+	const HMONITOR monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTOPRIMARY);
+	MONITORINFO info = { sizeof(info) };
+	if (!GetMonitorInfoW(monitor, &info)) return;
+
+	CRect windowRect;
+	GetWindowRect(&windowRect);
+	const int x = info.rcWork.left + (info.rcWork.right - info.rcWork.left - windowRect.Width()) / 2;
+	const int y = info.rcWork.top + (info.rcWork.bottom - info.rcWork.top - windowRect.Height()) / 2;
+	SetWindowPos(nullptr, x, y, 0, 0,
+		SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 #ifdef _DEBUG

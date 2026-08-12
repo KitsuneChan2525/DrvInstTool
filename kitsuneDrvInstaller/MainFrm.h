@@ -8,6 +8,7 @@ public:
 	virtual ~CMainFrame();
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 	virtual void OnUpdateFrameMenu(HMENU hMenuAlt);
+	void CenterOnCurrentScreen();
 
 #ifdef _DEBUG
 	virtual void AssertValid() const;
