@@ -29,7 +29,7 @@ namespace
 		{ L"Missing", L"缺失", L"缺少" },
 		{ L"Update available", L"可更新", L"可更新" },
 		{ L"Installed", L"已安装", L"已安裝" },
-		{ L"Installed - restart required", L"成功，需重启", L"成功，需重新啟動" },
+		{ L"Pending restart", L"待重启", L"待重新啟動" },
 		{ L"Failed", L"安装失败", L"安裝失敗" },
 		{ L"Loading driver indexes...", L"正在加载驱动索引...", L"正在載入驅動程式索引..." },
 		{ L"Enumerating Plug and Play devices...", L"正在枚举即插即用设备…", L"正在列舉隨插即用裝置…" },

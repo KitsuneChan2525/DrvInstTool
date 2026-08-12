@@ -16,6 +16,8 @@ public:
 	virtual void OnInitialUpdate();
 	virtual ~CkitsuneDrvInstallerView();
 	void CancelAiCountdownForUserInput();
+	static std::wstring FormatTimestampedLogForTest(const std::wstring& text, unsigned hour,
+		unsigned minute, unsigned second);
 
 #ifdef _DEBUG
 	virtual void AssertValid() const;

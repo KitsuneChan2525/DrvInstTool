@@ -329,10 +329,12 @@ void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
 	m_log.GetWindowTextW(existing);
 	SYSTEMTIME now;
 	GetLocalTime(&now);
-	CString line;
-	line.Format(L"[%02u:%02u:%02u] %s", now.wHour, now.wMinute, now.wSecond, text.c_str());
+	const std::wstring formatted = FormatTimestampedLogForTest(
+		text, now.wHour, now.wMinute, now.wSecond);
+	if (formatted.empty()) return;
+	CString appended(formatted.c_str());
 	if (!existing.IsEmpty()) existing += L"\r\n";
-	existing += line;
+	existing += appended;
 	m_log.SetWindowTextW(existing);
 	m_log.SetSel(-1, -1);
 	m_log.SendMessageW(EM_SCROLLCARET, 0, 0);
@@ -345,7 +347,7 @@ void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
 		FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (logFile != INVALID_HANDLE_VALUE)
 	{
-		CString fileLine = line + L"\r\n";
+		CString fileLine = appended + L"\r\n";
 		const int byteCount = WideCharToMultiByte(CP_UTF8, 0, fileLine.GetString(), fileLine.GetLength(),
 			nullptr, 0, nullptr, nullptr);
 		if (byteCount > 0)
@@ -359,6 +361,32 @@ void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
 		CloseHandle(logFile);
 	}
 	PumpMessages();
+}
+
+std::wstring CkitsuneDrvInstallerView::FormatTimestampedLogForTest(
+	const std::wstring& text, unsigned hour, unsigned minute, unsigned second)
+{
+	CString timestamp;
+	timestamp.Format(L"[%02u:%02u:%02u] ", hour, minute, second);
+	CString normalized(text.c_str());
+	normalized.Replace(L"\r\n", L"\n");
+	normalized.Replace(L"\r", L"\n");
+	CString appended;
+	int start = 0;
+	while (start <= normalized.GetLength())
+	{
+		const int end = normalized.Find(L'\n', start);
+		const CString part = end < 0 ? normalized.Mid(start) : normalized.Mid(start, end - start);
+		if (!part.IsEmpty())
+		{
+			if (!appended.IsEmpty()) appended += L"\r\n";
+			appended += timestamp;
+			appended += part;
+		}
+		if (end < 0) break;
+		start = end + 1;
+	}
+	return std::wstring(appended.GetString());
 }
 
 void CkitsuneDrvInstallerView::SetBusy(bool busy)
@@ -610,8 +638,11 @@ void CkitsuneDrvInstallerView::OnInstall()
 		summary += L"\r\n";
 		summary += failureLine;
 	}
-	summary += L"\r\n";
-	summary += Tr(TextId::RestartToApply);
+	if (!m_aiMode)
+	{
+		summary += L"\r\n";
+		summary += Tr(TextId::RestartToApply);
+	}
 	AppendLog(summary.GetString());
 	SetBusy(false);
 	if (mainFrame) mainFrame->SetInstallationActive(false);

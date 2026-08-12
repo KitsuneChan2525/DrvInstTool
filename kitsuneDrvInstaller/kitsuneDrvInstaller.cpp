@@ -145,6 +145,10 @@ namespace
 		const bool driverVersionRulesOk = DeviceScanner::RunVersionComparisonTests(driverVersionError);
 		std::wstring driverMatchingError;
 		const bool driverMatchingRulesOk = DriverCatalog::RunMatchingTests(driverMatchingError);
+		const std::wstring multilineLog = CkitsuneDrvInstallerView::FormatTimestampedLogForTest(
+			L"line one\r\nline two\nline three", 1, 2, 3);
+		const bool timestampedLogLinesOk = multilineLog ==
+			L"[01:02:03] line one\r\n[01:02:03] line two\r\n[01:02:03] line three";
 		std::wstring mediaCompatibilityError;
 		const bool mediaCompatibilityOk = SystemCompatibility::ValidateDriverMedia(dataRoot, mediaCompatibilityError);
 		std::wstring mediaTargetSystem;
@@ -186,6 +190,8 @@ namespace
 			<< "  \"driver_version_error\": \"" << JsonEscapeUtf8(driverVersionError) << "\",\n"
 			<< "  \"driver_matching_rules_ok\": " << (driverMatchingRulesOk ? "true" : "false") << ",\n"
 			<< "  \"driver_matching_error\": \"" << JsonEscapeUtf8(driverMatchingError) << "\",\n"
+			<< "  \"timestamped_log_lines_ok\": " << (timestampedLogLinesOk ? "true" : "false") << ",\n"
+			<< "  \"timestamped_log_output\": \"" << JsonEscapeUtf8(multilineLog) << "\",\n"
 			<< "  \"media_compatibility_ok\": " << (mediaCompatibilityOk ? "true" : "false") << ",\n"
 			<< "  \"media_compatibility_error\": \"" << JsonEscapeUtf8(mediaCompatibilityError) << "\",\n"
 			<< "  \"media_target_ok\": " << (mediaTargetOk ? "true" : "false") << ",\n"
