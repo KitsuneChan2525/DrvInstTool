@@ -18,7 +18,11 @@ public:
 protected:
 	CMFCStatusBar m_statusBar;
 	bool m_firstShowCentered = false;
+	bool m_fixedSizeActive = false;
+	CSize m_fixedWindowSize;
 	afx_msg int OnCreate(LPCREATESTRUCT createStruct);
 	afx_msg void OnShowWindow(BOOL show, UINT status);
+	afx_msg void OnSysCommand(UINT id, LPARAM parameter);
+	afx_msg void OnWindowPosChanging(WINDOWPOS* position);
 	DECLARE_MESSAGE_MAP()
 };

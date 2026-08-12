@@ -13,6 +13,8 @@ IMPLEMENT_DYNAMIC(CMainFrame, CMDIFrameWndEx)
 BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
 	ON_WM_CREATE()
 	ON_WM_SHOWWINDOW()
+	ON_WM_SYSCOMMAND()
+	ON_WM_WINDOWPOSCHANGING()
 END_MESSAGE_MAP()
 
 static UINT indicators[] = { ID_SEPARATOR };
@@ -34,6 +36,11 @@ int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 	m_statusBar.SetIndicators(indicators, _countof(indicators));
 	CMFCVisualManager::SetDefaultManager(RUNTIME_CLASS(CMFCVisualManagerWindows));
 	SetWindowTextW(Tr(TextId::AppTitle));
+	if (CMenu* systemMenu = GetSystemMenu(FALSE))
+	{
+		systemMenu->DeleteMenu(SC_SIZE, MF_BYCOMMAND);
+		systemMenu->DeleteMenu(SC_MAXIMIZE, MF_BYCOMMAND);
+	}
 	return 0;
 }
 
@@ -51,10 +58,9 @@ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 	if (!CMDIFrameWndEx::PreCreateWindow(cs)) return FALSE;
 	// The installer supplies its complete title. Do not let the MDI framework
 	// append the active child/document title a second time.
-	cs.style &= ~FWS_ADDTOTITLE;
+	cs.style &= ~(FWS_ADDTOTITLE | WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MAXIMIZE);
 	cs.cx = 1180;
 	cs.cy = 780;
-	cs.style &= ~WS_MAXIMIZE;
 	// Set the final coordinates before CreateWindowEx. The frame is therefore
 	// born at the centered position and never paints at a saved/old position.
 	POINT cursor = {};
@@ -92,9 +98,30 @@ void CMainFrame::OnShowWindow(BOOL show, UINT status)
 	if (show && !m_firstShowCentered)
 	{
 		CenterBeforeFirstShow();
+		CRect rect;
+		GetWindowRect(&rect);
+		m_fixedWindowSize = rect.Size();
+		m_fixedSizeActive = true;
 		m_firstShowCentered = true;
 	}
 	CMDIFrameWndEx::OnShowWindow(show, status);
+}
+
+void CMainFrame::OnSysCommand(UINT id, LPARAM parameter)
+{
+	const UINT command = id & 0xFFF0;
+	if (command == SC_SIZE || command == SC_MAXIMIZE) return;
+	CMDIFrameWndEx::OnSysCommand(id, parameter);
+}
+
+void CMainFrame::OnWindowPosChanging(WINDOWPOS* position)
+{
+	if (m_fixedSizeActive && (position->flags & SWP_NOSIZE) == 0)
+	{
+		position->cx = m_fixedWindowSize.cx;
+		position->cy = m_fixedWindowSize.cy;
+	}
+	CMDIFrameWndEx::OnWindowPosChanging(position);
 }
 
 #ifdef _DEBUG
