@@ -95,12 +95,16 @@ void CMainFrame::OnUpdateFrameMenu(HMENU /*hMenuAlt*/)
 BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 {
 	if (!CMDIFrameWndEx::PreCreateWindow(cs)) return FALSE;
+	// Use the dialog-style non-client frame to suppress the title-bar icon
+	// while retaining the close button, and keep the installer above ordinary
+	// application windows for the lifetime of the process.
+	cs.dwExStyle |= WS_EX_DLGMODALFRAME | WS_EX_TOPMOST;
 	// The installer supplies its complete title. Do not let the MDI framework
 	// append the active child/document title a second time.
 	cs.style &= ~(FWS_ADDTOTITLE | WS_THICKFRAME | WS_MINIMIZEBOX |
 		WS_MAXIMIZEBOX | WS_MINIMIZE | WS_MAXIMIZE);
-	cs.cx = 1180;
-	cs.cy = 780;
+	constexpr int PreferredWidth = 1180;
+	constexpr int PreferredHeight = 780;
 	// Set the final coordinates before CreateWindowEx. The frame is therefore
 	// born at the centered position and never paints at a saved/old position.
 	POINT cursor = {};
@@ -109,8 +113,21 @@ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 	MONITORINFO info = { sizeof(info) };
 	if (GetMonitorInfoW(monitor, &info))
 	{
+		const int workWidth = info.rcWork.right - info.rcWork.left;
+		const int workHeight = info.rcWork.bottom - info.rcWork.top;
+		constexpr int ScreenEdgeMargin = 8;
+		// 800x600 refers to the monitor resolution, not the application size.
+		// Size the frame below the monitor work area and preserve an outer margin;
+		// the taskbar has already been excluded by rcWork.
+		cs.cx = max(1, min(PreferredWidth, workWidth - ScreenEdgeMargin * 2));
+		cs.cy = max(1, min(PreferredHeight, workHeight - ScreenEdgeMargin * 2));
 		cs.x = info.rcWork.left + (info.rcWork.right - info.rcWork.left - cs.cx) / 2;
 		cs.y = info.rcWork.top + (info.rcWork.bottom - info.rcWork.top - cs.cy) / 2;
+	}
+	else
+	{
+		cs.cx = PreferredWidth;
+		cs.cy = PreferredHeight;
 	}
 	return TRUE;
 }

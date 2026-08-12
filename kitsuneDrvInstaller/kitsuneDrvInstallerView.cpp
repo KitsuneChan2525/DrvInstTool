@@ -205,54 +205,78 @@ void CkitsuneDrvInstallerView::OnSize(UINT type, int cx, int cy)
 
 void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 {
-	const int margin = 22;
-	const int gap = 8;
+	const bool compact = width < 900 || height < 650;
+	const int margin = compact ? 12 : 22;
+	const int gap = compact ? 6 : 8;
 	const int contentWidth = max(300, width - margin * 2);
 	CClientDC dc(this);
 	CFont* previousFont = dc.SelectObject(&m_titleFont);
 	TEXTMETRICW titleMetrics = {};
 	dc.GetTextMetricsW(&titleMetrics);
+	dc.SelectObject(&m_uiFont);
+	TEXTMETRICW uiMetrics = {};
+	dc.GetTextMetricsW(&uiMetrics);
 	dc.SelectObject(previousFont);
-	const int titleTop = 12;
-	const int titleHeight = max(36,
-		titleMetrics.tmHeight + titleMetrics.tmExternalLeading + 12);
+	const int titleTop = compact ? 5 : 12;
+	const int titleHeight = max(compact ? 30 : 36,
+		titleMetrics.tmHeight + titleMetrics.tmExternalLeading + (compact ? 6 : 12));
 
 	// Header: keep the language selector at the upper-right and reserve the
 	// remaining width for the package title so the controls never overlap.
-	const int languageWidth = 172;
-	const int languageLabelWidth = 74;
+	const int languageWidth = compact ? 140 : 172;
+	const int languageLabelWidth = compact ? 58 : 74;
 	const int languageX = width - margin - languageWidth;
 	const int languageLabelX = languageX - gap - languageLabelWidth;
 	m_title.MoveWindow(margin, titleTop, max(120, languageLabelX - margin - 14), titleHeight);
-	m_languageLabel.MoveWindow(languageLabelX, titleTop + 5, languageLabelWidth, 24);
+	m_languageLabel.MoveWindow(languageLabelX, titleTop + (compact ? 3 : 5), languageLabelWidth, 24);
 	m_language.SetWindowPos(nullptr, languageX, titleTop + 1, languageWidth, 240,
 		SWP_NOZORDER | SWP_SHOWWINDOW);
 
 	// All three actions share the row below the title.
-	const int scanWidth = 112;
-	const int selectWidth = 140;
-	const int installWidth = 140;
+	const int scanWidth = compact ? 90 : 112;
+	const int selectWidth = compact ? 110 : 140;
+	const int installWidth = compact ? 110 : 140;
 	const int installX = width - margin - installWidth;
 	const int selectX = installX - gap - selectWidth;
 	const int scanX = selectX - gap - scanWidth;
 	const int actionsTop = titleTop + titleHeight + gap;
-	m_scan.MoveWindow(scanX, actionsTop, scanWidth, 32);
-	m_selectRecommended.MoveWindow(selectX, actionsTop, selectWidth, 32);
-	m_install.MoveWindow(installX, actionsTop, installWidth, 32);
+	const int actionHeight = compact ? 28 : 32;
+	m_scan.MoveWindow(scanX, actionsTop, scanWidth, actionHeight);
+	m_selectRecommended.MoveWindow(selectX, actionsTop, selectWidth, actionHeight);
+	m_install.MoveWindow(installX, actionsTop, installWidth, actionHeight);
 
 	// The device list receives all flexible vertical space. Progress and log
 	// areas stay anchored to the bottom for a stable layout at every size.
-	const int devicesTop = actionsTop + 43;
-	const int logHeight = max(96, min(150, height / 5));
+	const int devicesTop = actionsTop + actionHeight + (compact ? 7 : 11);
+	const int logHeight = compact ? max(78, min(105, height / 5)) : max(96, min(150, height / 5));
 	const int logTop = height - margin - logHeight;
-	const int logLabelY = logTop - 25;
-	const int progressY = logLabelY - 23;
+	// Derive the label height from the selected UI font. A fixed 19-pixel
+	// height clipped CJK glyphs at high DPI and on the compact 800x600 layout.
+	const int logLabelHeight = max(compact ? 24 : 26,
+		uiMetrics.tmHeight + uiMetrics.tmExternalLeading + 6);
+	const int progressHeight = compact ? 13 : 17;
+	const int logLabelY = logTop - logLabelHeight - 2;
+	const int progressY = logLabelY - gap - progressHeight;
 	const int devicesBottom = progressY - gap;
 	const int listHeight = max(100, devicesBottom - devicesTop);
 	m_devices.MoveWindow(margin, devicesTop, contentWidth, listHeight);
-	m_progress.MoveWindow(margin, devicesTop + listHeight + gap, contentWidth, 17);
-	m_logLabel.MoveWindow(margin, logLabelY, 160, 22);
+	m_progress.MoveWindow(margin, devicesTop + listHeight + gap, contentWidth, progressHeight);
+	m_logLabel.MoveWindow(margin, logLabelY, 160, logLabelHeight);
 	m_log.MoveWindow(margin, logTop, contentWidth, max(50, height - logTop - margin));
+
+	// Fill the available width at every resolution instead of retaining the
+	// original 1000-pixel column set and forcing horizontal scrolling.
+	const int columnWidth = max(300, contentWidth - 4);
+	const int providerWidth = columnWidth * 20 / 100;
+	const int versionWidth = columnWidth * 15 / 100;
+	const int dateWidth = columnWidth * 15 / 100;
+	const int statusWidth = columnWidth * 13 / 100;
+	const int deviceWidth = columnWidth - providerWidth - versionWidth - dateWidth - statusWidth;
+	m_devices.SetColumnWidth(0, deviceWidth);
+	m_devices.SetColumnWidth(1, providerWidth);
+	m_devices.SetColumnWidth(2, versionWidth);
+	m_devices.SetColumnWidth(3, dateWidth);
+	m_devices.SetColumnWidth(4, statusWidth);
 }
 
 bool CkitsuneDrvInstallerView::InitializeLanguageSelector()
@@ -322,6 +346,11 @@ void CkitsuneDrvInstallerView::AppendLog(const std::wstring& text)
 void CkitsuneDrvInstallerView::SetBusy(bool busy)
 {
 	m_busy = busy;
+	// PumpMessages keeps the installer responsive while a driver is installed.
+	// Disable every interactive child so queued input cannot change language,
+	// selection, check boxes, or start another operation during that interval.
+	m_language.EnableWindow(!busy);
+	m_devices.EnableWindow(!busy);
 	m_scan.EnableWindow(!busy);
 	m_selectRecommended.EnableWindow(!busy && !m_matches.empty());
 	UpdateInstallButtonState();
@@ -342,6 +371,11 @@ void CkitsuneDrvInstallerView::UpdateInstallButtonState()
 
 void CkitsuneDrvInstallerView::OnDeviceItemChanged(NMHDR* notifyHeader, LRESULT* result)
 {
+	if (m_busy)
+	{
+		*result = 0;
+		return;
+	}
 	const NMLISTVIEW* item = reinterpret_cast<NMLISTVIEW*>(notifyHeader);
 	if ((item->uChanged & LVIF_STATE) != 0 &&
 		((item->uOldState ^ item->uNewState) & LVIS_STATEIMAGEMASK) != 0)
@@ -530,6 +564,7 @@ void CkitsuneDrvInstallerView::UpdateTitle()
 
 void CkitsuneDrvInstallerView::OnLanguageChanged()
 {
+	if (m_busy) return;
 	const int selection = m_language.GetCurSel();
 	if (selection < 0 || selection > 2) return;
 	Localization::SetLanguage(static_cast<UiLanguage>(selection));
