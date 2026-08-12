@@ -22,6 +22,10 @@ CMainFrame::~CMainFrame() = default;
 int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 {
 	if (CMDIFrameWndEx::OnCreate(createStruct) == -1) return -1;
+	// Keep the resource menu owned by MFC, but detach it while the frame is
+	// still hidden. This avoids both a first-frame flash and an invalid menu
+	// handle during later MDI updates/shutdown.
+	SetMenu(nullptr);
 	CMDITabInfo tabs;
 	EnableMDITabbedGroups(FALSE, tabs);
 	EnableMDITabs(FALSE);
@@ -44,9 +48,6 @@ void CMainFrame::OnUpdateFrameMenu(HMENU /*hMenuAlt*/)
 BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 {
 	if (!CMDIFrameWndEx::PreCreateWindow(cs)) return FALSE;
-	// LoadFrame places the IDR_MAINFRAME menu in CREATESTRUCT. Clear it before
-	// the HWND exists so Windows never renders a menu bar during the first frame.
-	cs.hMenu = nullptr;
 	cs.cx = 1180;
 	cs.cy = 780;
 	cs.style |= WS_MAXIMIZE;
