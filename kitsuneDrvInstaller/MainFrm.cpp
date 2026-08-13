@@ -55,21 +55,6 @@ int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 	CMDITabInfo tabs;
 	EnableMDITabbedGroups(FALSE, tabs);
 	EnableMDITabs(FALSE);
-	// The default MDI client uses a sunken client edge. With the menu and MDI
-	// child chrome removed, that edge is exposed as a dark horizontal line
-	// directly below the main caption. Make the client area completely flat.
-	if (m_hWndMDIClient != nullptr)
-	{
-		LONG_PTR style = ::GetWindowLongPtrW(m_hWndMDIClient, GWL_STYLE);
-		LONG_PTR exStyle = ::GetWindowLongPtrW(m_hWndMDIClient, GWL_EXSTYLE);
-		style &= ~WS_BORDER;
-		exStyle &= ~(WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_WINDOWEDGE);
-		::SetWindowLongPtrW(m_hWndMDIClient, GWL_STYLE, style);
-		::SetWindowLongPtrW(m_hWndMDIClient, GWL_EXSTYLE, exStyle);
-		::SetWindowPos(m_hWndMDIClient, nullptr, 0, 0, 0, 0,
-			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE |
-			SWP_FRAMECHANGED);
-	}
 	CMFCVisualManager::SetDefaultManager(RUNTIME_CLASS(CMFCVisualManagerWindows));
 	SetWindowTextW(Tr(TextId::AppTitle));
 	// Remove both per-window and class fallback icons. Together with
@@ -79,30 +64,8 @@ int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 	DefWindowProcW(WM_SETICON, ICON_SMALL, 0);
 	SetClassLongPtrW(GetSafeHwnd(), GCLP_HICON, 0);
 	SetClassLongPtrW(GetSafeHwnd(), GCLP_HICONSM, 0);
-	// CreateWindowEx can restore WS_EX_WINDOWEDGE for a dialog-modal frame.
-	// Remove it from the realized window as well, before the first frame is
-	// shown, so no dark client separator is painted below the caption.
-	ModifyStyleEx(WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_WINDOWEDGE, 0, 0);
 	SetWindowPos(nullptr, 0, 0, 0, 0,
 		SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-	// Windows 11 draws a DWM border between the native caption and the client
-	// area even after the MDI edges are removed. Ask DWM not to draw that border.
-	// Older Windows versions simply reject attribute 34, so the Vista-and-later
-	// compatibility path remains unchanged.
-	if (HMODULE dwmApi = LoadLibraryW(L"dwmapi.dll"))
-	{
-		using DwmSetWindowAttributeFn = HRESULT(WINAPI*)(HWND, DWORD, LPCVOID, DWORD);
-		const auto setDwmAttribute = reinterpret_cast<DwmSetWindowAttributeFn>(
-			GetProcAddress(dwmApi, "DwmSetWindowAttribute"));
-		if (setDwmAttribute != nullptr)
-		{
-			constexpr DWORD DwmWindowAttributeBorderColor = 34;
-			constexpr COLORREF DwmColorNone = 0xFFFFFFFE;
-			setDwmAttribute(GetSafeHwnd(), DwmWindowAttributeBorderColor,
-				&DwmColorNone, sizeof(DwmColorNone));
-		}
-		FreeLibrary(dwmApi);
-	}
 	if (CMenu* systemMenu = GetSystemMenu(FALSE))
 	{
 		systemMenu->DeleteMenu(SC_SIZE, MF_BYCOMMAND);
@@ -189,10 +152,6 @@ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 	// while retaining the close button, and keep the installer above ordinary
 	// application windows for the lifetime of the process.
 	cs.dwExStyle |= WS_EX_DLGMODALFRAME | WS_EX_TOPMOST;
-	// Keep the native caption but remove the extra 3-D window edge that MFC
-	// adds around the frame. Its inner top edge otherwise appears as a dark
-	// separator between the caption and the installer content.
-	cs.dwExStyle &= ~(WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_WINDOWEDGE);
 	// The installer supplies its complete title. Do not let the MDI framework
 	// append the active child/document title a second time.
 	cs.style &= ~(FWS_ADDTOTITLE | WS_THICKFRAME | WS_MINIMIZEBOX |
