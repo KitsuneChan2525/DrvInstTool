@@ -7,7 +7,7 @@
 
 struct PostInstallAction
 {
-	// Extensible action name. Current executor supports execute, msi and command;
+	// Extensible action name. Current executor supports execute, msi, command and install_inf;
 	// additional types can be added without changing the index container shape.
 	std::wstring type;
 	std::wstring file;
@@ -85,7 +85,8 @@ private:
 class DeviceScanner
 {
 public:
-	static bool Scan(const DriverCatalog& catalog, std::vector<DeviceMatch>& matches,
+	static bool Scan(const std::wstring& dataRoot, const DriverCatalog& catalog,
+		std::vector<DeviceMatch>& matches,
 		int& scannedDeviceCount, std::wstring& error);
 	static bool RunVersionComparisonTests(std::wstring& error);
 };

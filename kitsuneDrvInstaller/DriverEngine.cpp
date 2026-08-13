@@ -411,6 +411,45 @@ namespace
 		}
 	}
 
+	bool ParseAdditionalInfRules(JsonReader& reader, DriverPackage& package)
+	{
+		if (!reader.Consume('[')) return false;
+		if (reader.Consume(']')) return true;
+		for (;;)
+		{
+			if (!reader.Consume('{')) return false;
+			if (!reader.Consume('}'))
+			{
+				for (;;)
+				{
+					std::string key;
+					if (!reader.ParseString(key) || !reader.Consume(':')) return false;
+					if (key == "additional_infs")
+					{
+						if (!reader.Consume('[')) return false;
+						if (!reader.Consume(']'))
+						{
+							for (;;)
+							{
+								PostInstallAction action;
+								action.type = L"install_inf";
+								if (!ParseStringField(reader, action.file)) return false;
+								package.afterInstallActions.push_back(action);
+								if (reader.Consume(']')) break;
+								if (!reader.Consume(',')) return false;
+							}
+						}
+					}
+					else if (!reader.SkipValue()) return false;
+					if (reader.Consume('}')) break;
+					if (!reader.Consume(',')) return false;
+				}
+			}
+			if (reader.Consume(']')) return true;
+			if (!reader.Consume(',')) return false;
+		}
+	}
+
 	bool ParseSpecialize(JsonReader& reader, DriverPackage& package)
 	{
 		if (!reader.Consume('{')) return false;
@@ -422,6 +461,10 @@ namespace
 			if (key == "after_install")
 			{
 				if (!ParseSpecializedAfterInstall(reader, package)) return false;
+			}
+			else if (key == "install_pe")
+			{
+				if (!ParseAdditionalInfRules(reader, package)) return false;
 			}
 			else if (!reader.SkipValue()) return false;
 			if (reader.Consume('}')) return true;
@@ -1468,8 +1511,9 @@ namespace
 			command = L"pnputil.exe -i -a " + Quote(actionFile);
 			return true;
 		}
-		if (type == L"MSI" || FileNamePart(actionFile).size() >= 4 &&
-			FileNamePart(actionFile).substr(FileNamePart(actionFile).size() - 4) == L".MSI")
+		const std::wstring upperFileName = Upper(FileNamePart(actionFile));
+		if (type == L"MSI" || upperFileName.size() >= 4 &&
+			upperFileName.substr(upperFileName.size() - 4) == L".MSI")
 		{
 			command = L"msiexec.exe /i " + Quote(actionFile);
 			if (!action.arguments.empty()) command += L" " + action.arguments;
@@ -1686,6 +1730,18 @@ bool DriverInstaller::RunAfterInstallTests(std::wstring& error)
 		installInfCommand != L"pnputil.exe -i -a \"C:\\Drivers\\iusb3hcs.inf\"")
 	{
 		error = L"after_install install_inf command test failed";
+		return false;
+	}
+	PostInstallAction lowerCaseMsi;
+	lowerCaseMsi.type = L"execute";
+	lowerCaseMsi.arguments = L"/qn";
+	lowerCaseMsi.preventReboot = true;
+	std::wstring lowerCaseMsiCommand;
+	if (!BuildPostInstallCommand(L"EXECUTE", L"C:\\Drivers\\package.msi",
+		lowerCaseMsi, lowerCaseMsiCommand) ||
+		lowerCaseMsiCommand != L"msiexec.exe /i \"C:\\Drivers\\package.msi\" /qn REBOOT=ReallySuppress")
+	{
+		error = L"after_install lowercase MSI command test failed";
 		return false;
 	}
 	error.clear();
