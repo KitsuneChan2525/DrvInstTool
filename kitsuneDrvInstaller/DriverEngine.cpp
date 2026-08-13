@@ -962,6 +962,7 @@ namespace
 		unsigned long majorVersion = 0;
 		unsigned long minorVersion = 0;
 		unsigned long buildNumber = 0;
+		unsigned short servicePackMajor = 0;
 		std::wstring architecture;
 	};
 
@@ -983,6 +984,11 @@ namespace
 			ULONG buildNumber;
 			ULONG platformId;
 			WCHAR servicePack[128];
+			USHORT servicePackMajor;
+			USHORT servicePackMinor;
+			USHORT suiteMask;
+			UCHAR productType;
+			UCHAR reserved;
 		};
 		using RtlGetVersionFunction = LONG(WINAPI*)(RtlVersionInfo*);
 		HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
@@ -995,6 +1001,7 @@ namespace
 		version.majorVersion = info.majorVersion;
 		version.minorVersion = info.minorVersion;
 		version.buildNumber = info.buildNumber;
+		version.servicePackMajor = info.servicePackMajor;
 
 		SYSTEM_INFO systemInfo = {};
 		GetNativeSystemInfo(&systemInfo);
@@ -1016,7 +1023,9 @@ namespace
 	std::wstring CurrentSystemName(const DetectedWindowsVersion& version)
 	{
 		std::wstring name = L"Windows";
-		if (version.majorVersion == 6 && version.minorVersion == 0) name = L"Windows Vista";
+		if (version.majorVersion == 5 && version.minorVersion == 1) name = L"Windows XP";
+		else if (version.majorVersion == 5 && version.minorVersion == 2) name = L"Windows XP Professional x64 Edition";
+		else if (version.majorVersion == 6 && version.minorVersion == 0) name = L"Windows Vista";
 		else if (version.majorVersion == 6 && version.minorVersion == 1) name = L"Windows 7";
 		else if (version.majorVersion == 6 && version.minorVersion == 2) name = L"Windows 8";
 		else if (version.majorVersion == 6 && version.minorVersion == 3) name = L"Windows 8.1";
@@ -1024,9 +1033,12 @@ namespace
 		return name;
 	}
 
-	std::wstring RequiredSystemName(const std::wstring& targetOs)
+	std::wstring RequiredSystemName(const std::wstring& targetOs, const std::wstring& architecture)
 	{
 		const std::wstring os = Upper(targetOs);
+		if (os == L"WINXP") return Upper(architecture) == L"X64"
+			? L"Windows XP Professional x64 Edition Service Pack 2"
+			: L"Windows XP Service Pack 3";
 		if (os == L"WINVISTA") return L"Windows Vista Service Pack 2";
 		if (os == L"WIN7") return L"Windows 7 Service Pack 1";
 		if (os == L"WIN8") return L"Windows 8.x";
@@ -1047,6 +1059,7 @@ namespace
 	std::wstring DriverMediaSystemName(const std::wstring& targetOs)
 	{
 		const std::wstring os = Upper(targetOs);
+		if (os == L"WINXP") return L"Windows XP";
 		if (os == L"WINVISTA") return L"Windows Vista";
 		if (os == L"WIN7") return L"Windows 7";
 		if (os == L"WIN8") return L"Windows 8.x";
@@ -1058,12 +1071,31 @@ namespace
 }
 
 bool SystemCompatibility::IsVersionSupported(const std::wstring& targetOs, unsigned long majorVersion,
-	unsigned long minorVersion, unsigned long buildNumber, std::wstring& requiredVersion,
-	std::wstring& updateHint)
+	unsigned long minorVersion, unsigned long buildNumber, unsigned short servicePackMajor,
+	const std::wstring& architecture, std::wstring& requiredVersion, std::wstring& updateHint)
 {
 	requiredVersion.clear();
 	updateHint.clear();
 	const std::wstring os = Upper(targetOs);
+	if (os == L"WINXP")
+	{
+		const bool x64 = NormalizeArchitecture(architecture) == L"x64";
+		requiredVersion = x64 ? L"5.2.3790 Service Pack 2" : L"5.1.2600 Service Pack 3";
+		const unsigned short requiredServicePack = x64 ? 2 : 3;
+		const bool versionMatches = x64
+			? majorVersion == 5 && minorVersion == 2 && buildNumber == 3790
+			: majorVersion == 5 && minorVersion == 1 && buildNumber == 2600;
+		if (versionMatches && servicePackMajor < requiredServicePack)
+		{
+			switch (Localization::GetLanguage())
+			{
+			case UiLanguage::ChineseSimplified: updateHint = L"请更新操作系统至 Service Pack " + std::to_wstring(requiredServicePack) + L" 后继续执行驱动程序安装"; break;
+			case UiLanguage::ChineseTraditional: updateHint = L"請更新作業系統至 Service Pack " + std::to_wstring(requiredServicePack) + L" 後繼續執行驅動程式安裝"; break;
+			default: updateHint = L"Please update the operating system to Service Pack " + std::to_wstring(requiredServicePack) + L" before continuing driver installation"; break;
+			}
+		}
+		return versionMatches && servicePackMajor >= requiredServicePack;
+	}
 	if (os == L"WINVISTA")
 	{
 		requiredVersion = L"6.0.6002";
@@ -1142,7 +1174,7 @@ bool SystemCompatibility::ValidateDriverMedia(const std::wstring& dataRoot, std:
 		return false;
 	}
 	const std::wstring requiredArchitecture = NormalizeArchitecture(config.osArchitecture);
-	const std::wstring requiredSystemName = RequiredSystemName(config.os);
+	const std::wstring requiredSystemName = RequiredSystemName(config.os, requiredArchitecture);
 	std::wstring requiredVersion;
 	std::wstring updateHint;
 	if (requiredArchitecture.empty() || requiredSystemName.empty())
@@ -1158,7 +1190,7 @@ bool SystemCompatibility::ValidateDriverMedia(const std::wstring& dataRoot, std:
 		return false;
 	}
 	const bool versionMatches = IsVersionSupported(config.os, current.majorVersion, current.minorVersion,
-		current.buildNumber, requiredVersion, updateHint);
+		current.buildNumber, current.servicePackMajor, requiredArchitecture, requiredVersion, updateHint);
 	const bool architectureMatches = current.architecture == requiredArchitecture;
 	if (versionMatches && architectureMatches) return true;
 
@@ -1179,37 +1211,44 @@ bool SystemCompatibility::RunRuleTests(std::wstring& error)
 		unsigned long majorVersion;
 		unsigned long minorVersion;
 		unsigned long buildNumber;
+		unsigned short servicePackMajor;
+		const wchar_t* architecture;
 		bool expected;
 		bool expectsUpdateHint;
 	};
 	const TestCase cases[] =
 	{
-		{ L"WinVista", 6, 0, 6002, true, false },
-		{ L"WinVista", 6, 0, 6000, false, true },
-		{ L"WinVista", 6, 0, 6001, false, true },
-		{ L"Win7", 6, 1, 7601, true, false },
-		{ L"Win7", 6, 1, 7600, false, true },
-		{ L"Win8", 6, 2, 9200, true, false },
-		{ L"Win8", 6, 3, 9600, true, false },
+		{ L"WinXP", 5, 1, 2600, 3, L"x86", true, false },
+		{ L"WinXP", 5, 1, 2600, 2, L"x86", false, true },
+		{ L"WinXP", 5, 2, 3790, 2, L"x64", true, false },
+		{ L"WinXP", 5, 2, 3790, 1, L"x64", false, true },
+		{ L"WinXP", 6, 0, 6002, 0, L"x86", false, false },
+		{ L"WinVista", 6, 0, 6002, 0, L"x64", true, false },
+		{ L"WinVista", 6, 0, 6000, 0, L"x64", false, true },
+		{ L"WinVista", 6, 0, 6001, 0, L"x64", false, true },
+		{ L"Win7", 6, 1, 7601, 0, L"x64", true, false },
+		{ L"Win7", 6, 1, 7600, 0, L"x64", false, true },
+		{ L"Win8", 6, 2, 9200, 0, L"x64", true, false },
+		{ L"Win8", 6, 3, 9600, 0, L"x64", true, false },
 		// Negative case: reject an invalid Win8/8.1 version-and-build pairing.
-		{ L"Win8", 6, 3, 9200, false, false },
-		{ L"Win10", 10, 0, 10240, true, false },
+		{ L"Win8", 6, 3, 9200, 0, L"x64", false, false },
+		{ L"Win10", 10, 0, 10240, 0, L"x64", true, false },
 		// Negative boundary: reject the build immediately below the Win10 RTM minimum.
-		{ L"Win10", 10, 0, 10239, false, false },
-		{ L"Win10", 10, 0, 26100, true, false },
-		{ L"Win10RS5", 10, 0, 17763, true, false },
-		{ L"Win10RS5", 10, 0, 17762, false, false },
-		{ L"Win10RS5", 10, 0, 26100, true, false },
-		{ L"Win11", 10, 0, 22000, true, false },
-		{ L"Win11", 10, 0, 21999, false, false },
-		{ L"Win11", 10, 0, 26100, true, false }
+		{ L"Win10", 10, 0, 10239, 0, L"x64", false, false },
+		{ L"Win10", 10, 0, 26100, 0, L"x64", true, false },
+		{ L"Win10RS5", 10, 0, 17763, 0, L"x64", true, false },
+		{ L"Win10RS5", 10, 0, 17762, 0, L"x64", false, false },
+		{ L"Win10RS5", 10, 0, 26100, 0, L"x64", true, false },
+		{ L"Win11", 10, 0, 22000, 0, L"x64", true, false },
+		{ L"Win11", 10, 0, 21999, 0, L"x64", false, false },
+		{ L"Win11", 10, 0, 26100, 0, L"x64", true, false }
 	};
 	for (const auto& item : cases)
 	{
 		std::wstring requiredVersion;
 		std::wstring updateHint;
 		const bool actual = IsVersionSupported(item.os, item.majorVersion, item.minorVersion,
-			item.buildNumber, requiredVersion, updateHint);
+			item.buildNumber, item.servicePackMajor, item.architecture, requiredVersion, updateHint);
 		if (actual != item.expected || (!updateHint.empty()) != item.expectsUpdateHint)
 		{
 			error = std::wstring(L"Compatibility rule failed: ") + item.os + L" " +

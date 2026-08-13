@@ -98,8 +98,8 @@ public:
 		std::wstring& targetArchitecture);
 	static bool ValidateDriverMedia(const std::wstring& dataRoot, std::wstring& error);
 	static bool IsVersionSupported(const std::wstring& targetOs, unsigned long majorVersion,
-		unsigned long minorVersion, unsigned long buildNumber, std::wstring& requiredVersion,
-		std::wstring& updateHint);
+		unsigned long minorVersion, unsigned long buildNumber, unsigned short servicePackMajor,
+		const std::wstring& architecture, std::wstring& requiredVersion, std::wstring& updateHint);
 	static bool RunRuleTests(std::wstring& error);
 };
 
