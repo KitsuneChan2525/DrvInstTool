@@ -742,6 +742,8 @@ namespace
 		command.push_back(L'\0');
 		STARTUPINFOW startup = {};
 		startup.cb = sizeof(startup);
+		startup.dwFlags = STARTF_USESHOWWINDOW;
+		startup.wShowWindow = SW_HIDE;
 		PROCESS_INFORMATION process = {};
 		if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
 			nullptr, workingDirectory.empty() ? nullptr : workingDirectory.c_str(), &startup, &process))
@@ -775,6 +777,58 @@ namespace
 	{
 		const DWORD attributes = GetFileAttributesW(path.c_str());
 		return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+	}
+
+	bool ArchiveContainsFile(const std::wstring& sevenZip, const std::wstring& archive,
+		const std::wstring& filePath)
+	{
+		if (!FileExists(sevenZip) || !FileExists(archive) || filePath.empty()) return false;
+		const std::wstring command = Quote(sevenZip) + L" l -ba -slt " + Quote(archive) +
+			L" " + Quote(filePath);
+		SECURITY_ATTRIBUTES security = {};
+		security.nLength = sizeof(security);
+		security.bInheritHandle = TRUE;
+		HANDLE readPipe = nullptr, writePipe = nullptr;
+		if (!CreatePipe(&readPipe, &writePipe, &security, 0)) return false;
+		SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
+		std::vector<wchar_t> mutableCommand(command.begin(), command.end());
+		mutableCommand.push_back(L'\0');
+		STARTUPINFOW startup = {};
+		startup.cb = sizeof(startup);
+		startup.dwFlags = STARTF_USESHOWWINDOW;
+		startup.wShowWindow = SW_HIDE;
+		startup.dwFlags |= STARTF_USESTDHANDLES;
+		startup.hStdOutput = writePipe;
+		startup.hStdError = writePipe;
+		startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+		PROCESS_INFORMATION process = {};
+		const BOOL started = CreateProcessW(nullptr, mutableCommand.data(), nullptr, nullptr,
+			TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process);
+		CloseHandle(writePipe);
+		if (!started) { CloseHandle(readPipe); return false; }
+		std::string output;
+		char buffer[4096];
+		DWORD bytes = 0;
+		while (ReadFile(readPipe, buffer, sizeof(buffer), &bytes, nullptr) && bytes != 0)
+			output.append(buffer, bytes);
+		CloseHandle(readPipe);
+		WaitForSingleObject(process.hProcess, INFINITE);
+		DWORD exitCode = 1;
+		GetExitCodeProcess(process.hProcess, &exitCode);
+		CloseHandle(process.hThread);
+		CloseHandle(process.hProcess);
+		if (exitCode != 0) return false;
+		const std::string marker = "Path = ";
+		for (size_t position = 0; (position = output.find(marker, position)) != std::string::npos;)
+		{
+			position += marker.size();
+			const size_t end = output.find_first_of("\r\n", position);
+			const std::wstring listed = Utf8ToWide(output.substr(position, end - position));
+			if (_wcsicmp(listed.c_str(), filePath.c_str()) == 0) return true;
+			if (end == std::string::npos) break;
+			position = end;
+		}
+		return false;
 	}
 
 	bool FindFileRecursive(const std::wstring& directory, const std::wstring& fileName,
@@ -1273,11 +1327,13 @@ bool DriverCatalog::RunMatchingTests(std::wstring& error)
 	return true;
 }
 
-bool DeviceScanner::Scan(const DriverCatalog& catalog, std::vector<DeviceMatch>& matches,
-	int& scannedDeviceCount, std::wstring& error)
+bool DeviceScanner::Scan(const std::wstring& dataRoot, const DriverCatalog& catalog,
+	std::vector<DeviceMatch>& matches, int& scannedDeviceCount, std::wstring& error)
 {
 	matches.clear();
 	scannedDeviceCount = 0;
+	const std::wstring sevenZip = DriverInstaller::Find7Zip(dataRoot);
+	std::unordered_map<std::wstring, bool> mediaAvailability;
 	HDEVINFO set = SetupDiGetClassDevsW(nullptr, nullptr, nullptr, DIGCF_ALLCLASSES | DIGCF_PRESENT);
 	if (set == INVALID_HANDLE_VALUE)
 	{
@@ -1308,6 +1364,14 @@ bool DeviceScanner::Scan(const DriverCatalog& catalog, std::vector<DeviceMatch>&
 			matchContext.compatibleIds = true;
 			if (!catalog.Match(compatible, matchContext, package, matchedId, indexedName)) continue;
 		}
+		const std::wstring archive = JoinPath(JoinPath(dataRoot, package.packageDirectory),
+			package.archiveFile);
+		const std::wstring mediaKey = Upper(archive + L"|" + package.infPath);
+		auto availability = mediaAvailability.find(mediaKey);
+		if (availability == mediaAvailability.end())
+			availability = mediaAvailability.emplace(mediaKey,
+				ArchiveContainsFile(sevenZip, archive, package.infPath)).first;
+		if (!availability->second) continue;
 		DeviceMatch match;
 		wchar_t instanceId[4096] = {};
 		if (SetupDiGetDeviceInstanceIdW(set, &device, instanceId, _countof(instanceId), nullptr)) match.instanceId = instanceId;
@@ -1396,6 +1460,31 @@ std::wstring DriverInstaller::Find7Zip(const std::wstring& dataRoot)
 
 namespace
 {
+	bool BuildPostInstallCommand(const std::wstring& type, const std::wstring& actionFile,
+		const PostInstallAction& action, std::wstring& command)
+	{
+		if (type == L"INSTALL_INF")
+		{
+			command = L"pnputil.exe -i -a " + Quote(actionFile);
+			return true;
+		}
+		if (type == L"MSI" || FileNamePart(actionFile).size() >= 4 &&
+			FileNamePart(actionFile).substr(FileNamePart(actionFile).size() - 4) == L".MSI")
+		{
+			command = L"msiexec.exe /i " + Quote(actionFile);
+			if (!action.arguments.empty()) command += L" " + action.arguments;
+			if (action.preventReboot) command += L" REBOOT=ReallySuppress";
+			return true;
+		}
+		if (type == L"EXECUTE" || type == L"COMMAND")
+		{
+			command = Quote(actionFile);
+			if (!action.arguments.empty()) command += L" " + action.arguments;
+			return true;
+		}
+		return false;
+	}
+
 	bool RunPostInstallActions(const std::wstring& sevenZip, const std::wstring& archive,
 		const std::wstring& cache, const DriverPackage& driver, bool& rebootRequired,
 		std::wstring& error, const DriverInstaller::LogCallback& log)
@@ -1406,7 +1495,8 @@ namespace
 				Upper(driver.infPath).find(Upper(action.match)) == 0;
 			if (!matches) continue;
 			const std::wstring type = Upper(action.type);
-			if (type != L"EXECUTE" && type != L"MSI" && type != L"COMMAND")
+			std::wstring unusedCommand;
+			if (!BuildPostInstallCommand(type, L"configured.file", action, unusedCommand))
 			{
 				error = L"Unsupported after_install action type: " + action.type;
 				if (action.continueOnError) { if (log) log(error); continue; }
@@ -1431,29 +1521,23 @@ namespace
 				const std::wstring extract = Quote(sevenZip) + L" x -y -aoa -bd " +
 					Quote(L"-o" + cache) + L" " + Quote(archive) + L" " + Quote(pattern);
 				DWORD extractExit = 0;
-				if (!RunProcess(extract, extractExit, error) || extractExit != 0 ||
-					!ResolvePostInstallFile(cache, driver, action, actionFile))
+				if (!RunProcess(extract, extractExit, error)) return false;
+				if (extractExit != 0)
 				{
-					error = L"after_install file not found: " + action.file;
-					if (action.continueOnError) { if (log) log(error); continue; }
+					error = std::wstring(Tr(TextId::SevenZipExtractFailed)) +
+						std::to_wstring(extractExit) + L".";
 					return false;
+				}
+				if (!ResolvePostInstallFile(cache, driver, action, actionFile))
+				{
+					error.clear();
+					continue;
 				}
 			}
 			std::wstring workingDirectory = action.workingDirectory.empty()
 				? ParentDirectory(actionFile) : JoinPath(cache, action.workingDirectory);
 			std::wstring command;
-			if (type == L"MSI" || FileNamePart(actionFile).size() >= 4 &&
-				FileNamePart(actionFile).substr(FileNamePart(actionFile).size() - 4) == L".MSI")
-			{
-				command = L"msiexec.exe /i " + Quote(actionFile);
-				if (!action.arguments.empty()) command += L" " + action.arguments;
-				if (action.preventReboot) command += L" REBOOT=ReallySuppress";
-			}
-			else
-			{
-				command = Quote(actionFile);
-				if (!action.arguments.empty()) command += L" " + action.arguments;
-			}
+			if (!BuildPostInstallCommand(type, actionFile, action, command)) return false;
 			if (log) log(L"after_install: " + FileNamePart(actionFile));
 			DWORD exitCode = 0;
 			if (!RunProcess(command, exitCode, error, workingDirectory))
@@ -1592,6 +1676,16 @@ bool DriverInstaller::RunAfterInstallTests(std::wstring& error)
 	if (ActionExtractionPattern(package, action) != L"Video.HP\\Acer_7750\\*")
 	{
 		error = L"embedded after_install relative extraction test failed";
+		return false;
+	}
+	PostInstallAction installInf;
+	installInf.type = L"install_inf";
+	std::wstring installInfCommand;
+	if (!BuildPostInstallCommand(L"INSTALL_INF", L"C:\\Drivers\\iusb3hcs.inf",
+		installInf, installInfCommand) ||
+		installInfCommand != L"pnputil.exe -i -a \"C:\\Drivers\\iusb3hcs.inf\"")
+	{
+		error = L"after_install install_inf command test failed";
 		return false;
 	}
 	error.clear();
