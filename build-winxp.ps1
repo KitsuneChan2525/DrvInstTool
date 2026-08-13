@@ -1,7 +1,7 @@
 param(
-    [string]$VisualStudioRoot = 'E:\Program Files\Microsoft Visual Studio\2022\Community',
-    [string]$WindowsSdk71A = 'E:\Program Files (x86)\Microsoft SDKs\Windows\v7.1A',
-    [string]$UniversalCrtRoot = 'E:\Program Files (x86)\Windows Kits\10',
+    [string]$VisualStudioRoot = 'C:\Tools\Build\VS2022',
+    [string]$WindowsSdk71A = 'C:\Tools\Build\WindowsSDK\v7.1A',
+    [string]$UniversalCrtRoot = 'C:\Tools\Build\WindowsKits10',
     [string]$OutputRoot = 'D:\Project\DrvInst\WinXP'
 )
 
@@ -43,18 +43,12 @@ $projectText = $projectText.Replace('<OptimizeReferences>true</OptimizeReference
 Set-Content -LiteralPath $project -Value $projectText -Encoding Utf8
 
 $sdk = $WindowsSdk71A.TrimEnd('\') + '\'
-foreach ($build in @(
-    @{ Platform = 'Win32'; Folder = 'x86' },
-    @{ Platform = 'x64'; Folder = 'x64' }
-)) {
-    $out = Join-Path $buildRoot ($build.Folder + '\')
-    $obj = Join-Path $buildRoot ('obj-' + $build.Folder + '\')
-    & $msbuild $project /m /t:Rebuild /p:Configuration=Release /p:Platform=$($build.Platform) `
-        /p:PlatformToolset=v141_xp /p:WindowsSdkDir_71A="$sdk" /p:OutDir="$out" /p:IntDir="$obj"
-    if ($LASTEXITCODE -ne 0) { throw "XP $($build.Folder) build failed: $LASTEXITCODE" }
-    $destination = Join-Path $OutputRoot $build.Folder
-    New-Item -ItemType Directory -Force -Path $destination | Out-Null
-    Copy-Item -LiteralPath (Join-Path $out 'kitsuneDrvInstaller.exe') -Destination $destination -Force
-}
+$out = Join-Path $buildRoot 'x86\'
+$obj = Join-Path $buildRoot 'obj-x86\'
+& $msbuild $project /m /t:Rebuild /p:Configuration=Release /p:Platform=Win32 `
+    /p:PlatformToolset=v141_xp /p:WindowsSdkDir_71A="$sdk" /p:OutDir="$out" /p:IntDir="$obj"
+if ($LASTEXITCODE -ne 0) { throw "XP x86 build failed: $LASTEXITCODE" }
+New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
+Copy-Item -LiteralPath (Join-Path $out 'kitsuneDrvInstaller.exe') -Destination $OutputRoot -Force
 
-Write-Output "Windows XP x86/x64 build deployed to $OutputRoot"
+Write-Output "Windows XP x86 build deployed to $OutputRoot\kitsuneDrvInstaller.exe"
