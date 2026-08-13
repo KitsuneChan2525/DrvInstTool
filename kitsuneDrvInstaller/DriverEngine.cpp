@@ -327,6 +327,108 @@ namespace
 		}
 	}
 
+	bool ParseLegacyAfterInstall(JsonReader& reader, DriverPackage& package)
+	{
+		if (!reader.Consume('{')) return false;
+		if (reader.Consume('}')) return true;
+		for (;;)
+		{
+			std::string order;
+			std::wstring configuredCommand;
+			if (!reader.ParseString(order) || !reader.Consume(':') ||
+				!ParseStringField(reader, configuredCommand)) return false;
+			PostInstallAction action;
+			action.type = L"execute";
+			const size_t separator = configuredCommand.find(L',');
+			action.file = separator == std::wstring::npos
+				? configuredCommand : configuredCommand.substr(0, separator);
+			action.arguments = separator == std::wstring::npos
+				? std::wstring() : configuredCommand.substr(separator + 1);
+			package.afterInstallActions.push_back(action);
+			if (reader.Consume('}')) return true;
+			if (!reader.Consume(',')) return false;
+		}
+	}
+
+	bool ParsePostInstallAction(JsonReader& reader, PostInstallAction& action)
+	{
+		if (!reader.Consume('{')) return false;
+		if (reader.Consume('}')) return true;
+		for (;;)
+		{
+			std::string key;
+			if (!reader.ParseString(key) || !reader.Consume(':')) return false;
+			if (key == "type") { if (!ParseStringField(reader, action.type)) return false; }
+			else if (key == "file") { if (!ParseStringField(reader, action.file)) return false; }
+			else if (key == "arguments" || key == "args") { if (!ParseStringField(reader, action.arguments)) return false; }
+			else if (key == "working_directory") { if (!ParseStringField(reader, action.workingDirectory)) return false; }
+			else if (key == "continue_on_error") { if (!reader.ParseBoolean(action.continueOnError)) return false; }
+			else if (key == "prevent_reboot") { if (!reader.ParseBoolean(action.preventReboot)) return false; }
+			else if (!reader.SkipValue()) return false;
+			if (reader.Consume('}')) return true;
+			if (!reader.Consume(',')) return false;
+		}
+	}
+
+	bool ParseSpecializedAfterInstall(JsonReader& reader, DriverPackage& package)
+	{
+		if (!reader.Consume('[')) return false;
+		if (reader.Consume(']')) return true;
+		for (;;)
+		{
+			if (!reader.Consume('{')) return false;
+			std::wstring match;
+			PostInstallAction action;
+			if (!reader.Consume('}'))
+			{
+				for (;;)
+				{
+					std::string key;
+					if (!reader.ParseString(key) || !reader.Consume(':')) return false;
+					if (key == "match") { if (!ParseStringField(reader, match)) return false; }
+					else if (key == "action") { if (!ParsePostInstallAction(reader, action)) return false; }
+					else if (!reader.SkipValue()) return false;
+					if (reader.Consume('}')) break;
+					if (!reader.Consume(',')) return false;
+				}
+			}
+			if (_wcsicmp(action.type.c_str(), L"embedded_config") == 0)
+			{
+				for (auto& configured : package.afterInstallActions)
+					if (configured.match.empty())
+					{
+						configured.match = match;
+						configured.relativeToDriverDirectory = true;
+					}
+			}
+			else if (!action.type.empty())
+			{
+				action.match = match;
+				package.afterInstallActions.push_back(action);
+			}
+			if (reader.Consume(']')) return true;
+			if (!reader.Consume(',')) return false;
+		}
+	}
+
+	bool ParseSpecialize(JsonReader& reader, DriverPackage& package)
+	{
+		if (!reader.Consume('{')) return false;
+		if (reader.Consume('}')) return true;
+		for (;;)
+		{
+			std::string key;
+			if (!reader.ParseString(key) || !reader.Consume(':')) return false;
+			if (key == "after_install")
+			{
+				if (!ParseSpecializedAfterInstall(reader, package)) return false;
+			}
+			else if (!reader.SkipValue()) return false;
+			if (reader.Consume('}')) return true;
+			if (!reader.Consume(',')) return false;
+		}
+	}
+
 	bool ParseDriver(JsonReader& reader, DriverPackage& package)
 	{
 		if (!reader.Consume('{')) return false;
@@ -343,6 +445,8 @@ namespace
 			else if (key == "provider") { if (!ParseStringField(reader, package.provider)) return false; }
 			else if (key == "device_class") { if (!ParseStringField(reader, package.deviceClass)) return false; }
 			else if (key == "archive") { if (!ParseArchive(reader, package)) return false; }
+			else if (key == "after_install") { if (!ParseLegacyAfterInstall(reader, package)) return false; }
+			else if (key == "specialize") { if (!ParseSpecialize(reader, package)) return false; }
 			else if (!reader.SkipValue()) return false;
 			if (reader.Consume('}')) return true;
 			if (!reader.Consume(',')) return false;
@@ -631,14 +735,16 @@ namespace
 		return result == ERROR_SUCCESS || result == ERROR_ALREADY_EXISTS || GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES;
 	}
 
-	bool RunProcess(const std::wstring& commandLine, DWORD& exitCode, std::wstring& error)
+	bool RunProcess(const std::wstring& commandLine, DWORD& exitCode, std::wstring& error,
+		const std::wstring& workingDirectory = {})
 	{
 		std::vector<wchar_t> command(commandLine.begin(), commandLine.end());
 		command.push_back(L'\0');
 		STARTUPINFOW startup = {};
 		startup.cb = sizeof(startup);
 		PROCESS_INFORMATION process = {};
-		if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process))
+		if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+			nullptr, workingDirectory.empty() ? nullptr : workingDirectory.c_str(), &startup, &process))
 		{
 			error = FormatWin32Error(GetLastError());
 			return false;
@@ -663,6 +769,95 @@ namespace
 	{
 		const size_t slash = path.find_last_of(L"\\/");
 		return slash == std::wstring::npos ? std::wstring() : path.substr(0, slash);
+	}
+
+	bool FileExists(const std::wstring& path)
+	{
+		const DWORD attributes = GetFileAttributesW(path.c_str());
+		return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+	}
+
+	bool FindFileRecursive(const std::wstring& directory, const std::wstring& fileName,
+		std::wstring& result)
+	{
+		WIN32_FIND_DATAW data = {};
+		const HANDLE find = FindFirstFileW(JoinPath(directory, L"*").c_str(), &data);
+		if (find == INVALID_HANDLE_VALUE) return false;
+		bool found = false;
+		do
+		{
+			if (wcscmp(data.cFileName, L".") == 0 || wcscmp(data.cFileName, L"..") == 0) continue;
+			const std::wstring path = JoinPath(directory, data.cFileName);
+			if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+				found = FindFileRecursive(path, fileName, result);
+			else if (_wcsicmp(data.cFileName, fileName.c_str()) == 0)
+			{
+				result = path;
+				found = true;
+			}
+		} while (!found && FindNextFileW(find, &data));
+		FindClose(find);
+		return found;
+	}
+
+	bool IsBlockedRestartCommand(const std::wstring& file, const std::wstring& arguments)
+	{
+		const std::wstring name = FileNamePart(file);
+		const std::wstring args = Upper(arguments);
+		if (name == L"SHUTDOWN.EXE" || name == L"RESTART.EXE") return true;
+		if ((name == L"CMD.EXE" || name == L"POWERSHELL.EXE" || name == L"PWSH.EXE") &&
+			(args.find(L"SHUTDOWN") != std::wstring::npos ||
+			 args.find(L"RESTART-COMPUTER") != std::wstring::npos)) return true;
+		return false;
+	}
+
+	std::wstring ActionExtractionPattern(const DriverPackage& driver,
+		const PostInstallAction& action)
+	{
+		if (action.relativeToDriverDirectory)
+		{
+			const std::wstring driverDirectory = ParentDirectory(driver.infPath);
+			const std::wstring normalizedMatch = Upper(action.match);
+			const std::wstring normalizedDirectory = Upper(driverDirectory);
+			if (!action.match.empty() && normalizedDirectory.find(normalizedMatch + L"\\") == 0)
+				return action.match + L"\\*";
+			return driverDirectory + L"\\*";
+		}
+		if (!action.match.empty())
+		{
+			const size_t dot = action.match.find_last_of(L'.');
+			const size_t slash = action.match.find_last_of(L"\\/");
+			return dot != std::wstring::npos && (slash == std::wstring::npos || dot > slash)
+				? ParentDirectory(action.match) + L"\\*" : action.match + L"\\*";
+		}
+		if (action.file.find(L'\\') != std::wstring::npos || action.file.find(L'/') != std::wstring::npos)
+			return ParentDirectory(action.file) + L"\\*";
+		return ParentDirectory(driver.infPath) + L"\\*";
+	}
+
+	bool ResolvePostInstallFile(const std::wstring& cache, const DriverPackage& driver,
+		const PostInstallAction& action, std::wstring& path)
+	{
+		path = JoinPath(cache, action.file);
+		if (FileExists(path)) return true;
+		if (action.relativeToDriverDirectory)
+		{
+			const std::wstring driverDirectory = JoinPath(cache, ParentDirectory(driver.infPath));
+			path = JoinPath(driverDirectory, action.file);
+			if (FileExists(path)) return true;
+			if (FindFileRecursive(driverDirectory, FileNamePart(action.file), path)) return true;
+			if (!action.match.empty())
+				return FindFileRecursive(JoinPath(cache, action.match), FileNamePart(action.file), path);
+			return false;
+		}
+		const size_t dot = action.match.find_last_of(L'.');
+		const size_t slash = action.match.find_last_of(L"\\/");
+		const bool matchIsFile = dot != std::wstring::npos &&
+			(slash == std::wstring::npos || dot > slash);
+		const std::wstring base = action.match.empty() ? ParentDirectory(driver.infPath) :
+			(matchIsFile ? ParentDirectory(action.match) : action.match);
+		const std::wstring searchRoot = JoinPath(cache, base);
+		return FindFileRecursive(searchRoot, FileNamePart(action.file), path);
 	}
 
 	struct DetectedWindowsVersion
@@ -960,6 +1155,13 @@ bool DriverCatalog::Load(const std::wstring& dataRoot, std::wstring& error)
 	return true;
 }
 
+size_t DriverCatalog::AfterInstallActionCount() const
+{
+	size_t count = 0;
+	for (const auto& item : m_drivers) count += item.second.afterInstallActions.size();
+	return count;
+}
+
 bool DriverCatalog::Match(const std::vector<std::wstring>& hardwareIds,
 	const DriverMatchContext& context, DriverPackage& driver,
 	std::wstring& matchedHardwareId, std::wstring& indexedDeviceName) const
@@ -1192,6 +1394,91 @@ std::wstring DriverInstaller::Find7Zip(const std::wstring& dataRoot)
 	return {};
 }
 
+namespace
+{
+	bool RunPostInstallActions(const std::wstring& sevenZip, const std::wstring& archive,
+		const std::wstring& cache, const DriverPackage& driver, bool& rebootRequired,
+		std::wstring& error, const DriverInstaller::LogCallback& log)
+	{
+		for (const auto& action : driver.afterInstallActions)
+		{
+			const bool matches = action.match.empty() ||
+				Upper(driver.infPath).find(Upper(action.match)) == 0;
+			if (!matches) continue;
+			const std::wstring type = Upper(action.type);
+			if (type != L"EXECUTE" && type != L"MSI" && type != L"COMMAND")
+			{
+				error = L"Unsupported after_install action type: " + action.type;
+				if (action.continueOnError) { if (log) log(error); continue; }
+				return false;
+			}
+			if (action.file.empty())
+			{
+				error = L"after_install action has no configured file.";
+				if (action.continueOnError) { if (log) log(error); continue; }
+				return false;
+			}
+			if (action.preventReboot && IsBlockedRestartCommand(action.file, action.arguments))
+			{
+				error = L"Blocked after_install restart command: " + action.file;
+				if (action.continueOnError) { if (log) log(error); continue; }
+				return false;
+			}
+			std::wstring actionFile;
+			if (!ResolvePostInstallFile(cache, driver, action, actionFile))
+			{
+				const std::wstring pattern = ActionExtractionPattern(driver, action);
+				const std::wstring extract = Quote(sevenZip) + L" x -y -aoa -bd " +
+					Quote(L"-o" + cache) + L" " + Quote(archive) + L" " + Quote(pattern);
+				DWORD extractExit = 0;
+				if (!RunProcess(extract, extractExit, error) || extractExit != 0 ||
+					!ResolvePostInstallFile(cache, driver, action, actionFile))
+				{
+					error = L"after_install file not found: " + action.file;
+					if (action.continueOnError) { if (log) log(error); continue; }
+					return false;
+				}
+			}
+			std::wstring workingDirectory = action.workingDirectory.empty()
+				? ParentDirectory(actionFile) : JoinPath(cache, action.workingDirectory);
+			std::wstring command;
+			if (type == L"MSI" || FileNamePart(actionFile).size() >= 4 &&
+				FileNamePart(actionFile).substr(FileNamePart(actionFile).size() - 4) == L".MSI")
+			{
+				command = L"msiexec.exe /i " + Quote(actionFile);
+				if (!action.arguments.empty()) command += L" " + action.arguments;
+				if (action.preventReboot) command += L" REBOOT=ReallySuppress";
+			}
+			else
+			{
+				command = Quote(actionFile);
+				if (!action.arguments.empty()) command += L" " + action.arguments;
+			}
+			if (log) log(L"after_install: " + FileNamePart(actionFile));
+			DWORD exitCode = 0;
+			if (!RunProcess(command, exitCode, error, workingDirectory))
+			{
+				error = L"Failed to start after_install action: " + action.file + L"; " + error;
+				if (action.continueOnError) { if (log) log(error); continue; }
+				return false;
+			}
+			if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED || exitCode == ERROR_SUCCESS_REBOOT_INITIATED)
+			{
+				rebootRequired = true;
+				continue;
+			}
+			if (exitCode != 0)
+			{
+				error = L"after_install action failed: " + action.file + L"; exit code " +
+					std::to_wstring(exitCode) + L".";
+				if (action.continueOnError) { if (log) log(error); continue; }
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
 bool DriverInstaller::Install(const std::wstring& dataRoot, const DeviceMatch& match,
 	bool& rebootRequired, std::wstring& error, const LogCallback& log)
 {
@@ -1277,5 +1564,36 @@ bool DriverInstaller::Install(const std::wstring& dataRoot, const DeviceMatch& m
 		return false;
 	}
 	rebootRequired = reboot != FALSE;
+	if (!RunPostInstallActions(sevenZip, archive, cache, match.driver,
+		rebootRequired, error, log)) return false;
+	return true;
+}
+
+bool DriverInstaller::RunAfterInstallTests(std::wstring& error)
+{
+	PostInstallAction action;
+	action.file = L"shutdown.exe";
+	action.arguments = L"/r /t 0";
+	if (!IsBlockedRestartCommand(action.file, action.arguments))
+	{
+		error = L"after_install restart blocking test failed";
+		return false;
+	}
+	DriverPackage package;
+	package.infPath = L"Video.AMD1\\Public_New\\C7380461.inf";
+	action.match = L"Video.AMD1\\Public_New";
+	if (ActionExtractionPattern(package, action) != L"Video.AMD1\\Public_New\\*")
+	{
+		error = L"after_install extraction pattern test failed";
+		return false;
+	}
+	action.relativeToDriverDirectory = true;
+	package.infPath = L"Video.HP\\Acer_7750\\C7120845.inf";
+	if (ActionExtractionPattern(package, action) != L"Video.HP\\Acer_7750\\*")
+	{
+		error = L"embedded after_install relative extraction test failed";
+		return false;
+	}
+	error.clear();
 	return true;
 }

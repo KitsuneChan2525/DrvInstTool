@@ -145,6 +145,8 @@ namespace
 		const bool driverVersionRulesOk = DeviceScanner::RunVersionComparisonTests(driverVersionError);
 		std::wstring driverMatchingError;
 		const bool driverMatchingRulesOk = DriverCatalog::RunMatchingTests(driverMatchingError);
+		std::wstring afterInstallError;
+		const bool afterInstallRulesOk = DriverInstaller::RunAfterInstallTests(afterInstallError);
 		const std::wstring multilineLog = CkitsuneDrvInstallerView::FormatTimestampedLogForTest(
 			L"line one\r\nline two\nline three", 1, 2, 3);
 		const bool timestampedLogLinesOk = multilineLog ==
@@ -190,6 +192,8 @@ namespace
 			<< "  \"driver_version_error\": \"" << JsonEscapeUtf8(driverVersionError) << "\",\n"
 			<< "  \"driver_matching_rules_ok\": " << (driverMatchingRulesOk ? "true" : "false") << ",\n"
 			<< "  \"driver_matching_error\": \"" << JsonEscapeUtf8(driverMatchingError) << "\",\n"
+			<< "  \"after_install_rules_ok\": " << (afterInstallRulesOk ? "true" : "false") << ",\n"
+			<< "  \"after_install_error\": \"" << JsonEscapeUtf8(afterInstallError) << "\",\n"
 			<< "  \"timestamped_log_lines_ok\": " << (timestampedLogLinesOk ? "true" : "false") << ",\n"
 			<< "  \"timestamped_log_output\": \"" << JsonEscapeUtf8(multilineLog) << "\",\n"
 			<< "  \"media_compatibility_ok\": " << (mediaCompatibilityOk ? "true" : "false") << ",\n"
@@ -199,6 +203,7 @@ namespace
 			<< "  \"media_target_architecture\": \"" << JsonEscapeUtf8(mediaTargetArchitecture) << "\",\n"
 			<< "  \"catalog_loaded\": " << (catalogLoaded ? "true" : "false") << ",\n"
 			<< "  \"driver_count\": " << catalog.DriverCount() << ",\n"
+			<< "  \"after_install_action_count\": " << catalog.AfterInstallActionCount() << ",\n"
 			<< "  \"hardware_id_count\": " << catalog.HardwareIdCount() << ",\n"
 			<< "  \"device_scan_ok\": " << (scanOk ? "true" : "false") << ",\n"
 			<< "  \"scanned_device_count\": " << scanned << ",\n"

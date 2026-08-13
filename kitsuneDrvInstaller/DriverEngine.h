@@ -5,6 +5,20 @@
 #include <unordered_map>
 #include <vector>
 
+struct PostInstallAction
+{
+	// Extensible action name. Current executor supports execute, msi and command;
+	// additional types can be added without changing the index container shape.
+	std::wstring type;
+	std::wstring file;
+	std::wstring arguments;
+	std::wstring match;
+	std::wstring workingDirectory;
+	bool continueOnError = false;
+	bool preventReboot = true;
+	bool relativeToDriverDirectory = false;
+};
+
 struct DriverPackage
 {
 	std::wstring id;
@@ -17,6 +31,7 @@ struct DriverPackage
 	std::wstring driverVersion;
 	std::wstring provider;
 	std::wstring deviceClass;
+	std::vector<PostInstallAction> afterInstallActions;
 };
 
 struct DeviceMatch
@@ -60,6 +75,7 @@ public:
 	static bool RunMatchingTests(std::wstring& error);
 	size_t DriverCount() const { return m_drivers.size(); }
 	size_t HardwareIdCount() const { return m_hardwareIds.size(); }
+	size_t AfterInstallActionCount() const;
 
 private:
 	std::unordered_map<std::wstring, DriverPackage> m_drivers;
@@ -94,4 +110,5 @@ public:
 	static bool Install(const std::wstring& dataRoot, const DeviceMatch& match,
 		bool& rebootRequired, std::wstring& error, const LogCallback& log);
 	static std::wstring Find7Zip(const std::wstring& dataRoot);
+	static bool RunAfterInstallTests(std::wstring& error);
 };
