@@ -12,6 +12,7 @@ public:
 	void CenterBeforeFirstShow();
 	void SetInstallationActive(bool active);
 	void RefreshVersionStatus();
+	void RefreshWindowTitle();
 
 #ifdef _DEBUG
 	virtual void AssertValid() const;

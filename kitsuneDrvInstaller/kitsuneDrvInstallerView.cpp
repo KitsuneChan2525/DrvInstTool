@@ -682,9 +682,21 @@ void CkitsuneDrvInstallerView::ApplyLanguage()
 
 void CkitsuneDrvInstallerView::UpdateTitle()
 {
-	const std::wstring title = L"kitsune Driver Installer";
-	m_title.SetWindowTextW(title.c_str());
-	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(title.c_str());
+	const std::wstring applicationTitle = L"kitsune Driver Installer";
+	m_title.SetWindowTextW(applicationTitle.c_str());
+	std::wstring targetSystem;
+	std::wstring targetArchitecture;
+	std::wstring windowTitle = applicationTitle;
+	if (SystemCompatibility::GetDriverMediaTarget(
+		CurrentDataRoot(), targetSystem, targetArchitecture))
+	{
+		windowTitle += L" - [";
+		windowTitle += targetSystem;
+		windowTitle += L" ";
+		windowTitle += targetArchitecture;
+		windowTitle += L"]";
+	}
+	if (AfxGetMainWnd()) AfxGetMainWnd()->SetWindowTextW(windowTitle.c_str());
 }
 
 void CkitsuneDrvInstallerView::OnLanguageChanged()

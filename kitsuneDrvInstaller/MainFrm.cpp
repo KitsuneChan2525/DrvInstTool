@@ -4,6 +4,7 @@
 #include "MainFrm.h"
 #include "Localization.h"
 #include "AppVersion.h"
+#include "DriverEngine.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -90,6 +91,27 @@ void CMainFrame::RefreshVersionStatus()
 	if (current != text) m_statusBar.SetPaneText(0, text);
 }
 
+void CMainFrame::RefreshWindowTitle()
+{
+	wchar_t module[MAX_PATH] = {};
+	GetModuleFileNameW(nullptr, module, _countof(module));
+	std::wstring executablePath(module);
+	const size_t slash = executablePath.find_last_of(L"\\/");
+	const std::wstring dataRoot =
+		(executablePath.substr(0, slash) + L"\\Data");
+	std::wstring targetSystem;
+	std::wstring targetArchitecture;
+	std::wstring title = L"kitsune Driver Installer";
+	if (SystemCompatibility::GetDriverMediaTarget(
+		dataRoot, targetSystem, targetArchitecture))
+	{
+		title += L" - [" + targetSystem + L" " + targetArchitecture + L"]";
+	}
+	CString current;
+	GetWindowTextW(current);
+	if (current != title.c_str()) SetWindowTextW(title.c_str());
+}
+
 LRESULT CMainFrame::OnSetMessageString(WPARAM wParam, LPARAM lParam)
 {
 	const LRESULT result = CMDIFrameWndEx::OnSetMessageString(wParam, lParam);
@@ -106,7 +128,11 @@ LRESULT CMainFrame::OnSetIcon(WPARAM wParam, LPARAM)
 
 void CMainFrame::OnTimer(UINT_PTR timerId)
 {
-	if (timerId == 1) RefreshVersionStatus();
+	if (timerId == 1)
+	{
+		RefreshVersionStatus();
+		RefreshWindowTitle();
+	}
 	CMDIFrameWndEx::OnTimer(timerId);
 }
 

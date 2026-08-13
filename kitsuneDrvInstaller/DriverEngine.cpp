@@ -747,6 +747,8 @@ namespace
 			default: return L"Windows 10 or later";
 			}
 		}
+		if (os == L"WIN10RS5") return L"Windows 10";
+		if (os == L"WIN11") return L"Windows 11";
 		return {};
 	}
 
@@ -757,6 +759,8 @@ namespace
 		if (os == L"WIN7") return L"Windows 7";
 		if (os == L"WIN8") return L"Windows 8.x";
 		if (os == L"WIN10") return L"Windows 10";
+		if (os == L"WIN10RS5") return L"Windows 10";
+		if (os == L"WIN11") return L"Windows 11";
 		return {};
 	}
 }
@@ -798,6 +802,28 @@ bool SystemCompatibility::IsVersionSupported(const std::wstring& targetOs, unsig
 		}
 		return majorVersion > 10 || (majorVersion == 10 &&
 			(minorVersion > 0 || (minorVersion == 0 && buildNumber >= 10240)));
+	}
+	if (os == L"WIN10RS5")
+	{
+		switch (Localization::GetLanguage())
+		{
+		case UiLanguage::ChineseSimplified: requiredVersion = L"10.0.17763 或更高版本"; break;
+		case UiLanguage::ChineseTraditional: requiredVersion = L"10.0.17763 或更新版本"; break;
+		default: requiredVersion = L"10.0.17763 or later"; break;
+		}
+		return majorVersion > 10 || (majorVersion == 10 &&
+			(minorVersion > 0 || (minorVersion == 0 && buildNumber >= 17763)));
+	}
+	if (os == L"WIN11")
+	{
+		switch (Localization::GetLanguage())
+		{
+		case UiLanguage::ChineseSimplified: requiredVersion = L"10.0.22000 或更高版本"; break;
+		case UiLanguage::ChineseTraditional: requiredVersion = L"10.0.22000 或更新版本"; break;
+		default: requiredVersion = L"10.0.22000 or later"; break;
+		}
+		return majorVersion > 10 || (majorVersion == 10 &&
+			(minorVersion > 0 || (minorVersion == 0 && buildNumber >= 22000)));
 	}
 	return false;
 }
@@ -878,7 +904,13 @@ bool SystemCompatibility::RunRuleTests(std::wstring& error)
 		{ L"Win10", 10, 0, 10240, true, false },
 		// Negative boundary: reject the build immediately below the Win10 RTM minimum.
 		{ L"Win10", 10, 0, 10239, false, false },
-		{ L"Win10", 10, 0, 26100, true, false }
+		{ L"Win10", 10, 0, 26100, true, false },
+		{ L"Win10RS5", 10, 0, 17763, true, false },
+		{ L"Win10RS5", 10, 0, 17762, false, false },
+		{ L"Win10RS5", 10, 0, 26100, true, false },
+		{ L"Win11", 10, 0, 22000, true, false },
+		{ L"Win11", 10, 0, 21999, false, false },
+		{ L"Win11", 10, 0, 26100, true, false }
 	};
 	for (const auto& item : cases)
 	{
