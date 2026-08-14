@@ -150,7 +150,7 @@ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 	if (!CMDIFrameWndEx::PreCreateWindow(cs)) return FALSE;
 	// Use the dialog-style non-client frame to suppress the title-bar icon
 	// while retaining the close button, and keep the installer above ordinary
-	// application windows until driver installation begins.
+	// application windows for the lifetime of the process.
 	cs.dwExStyle |= WS_EX_DLGMODALFRAME | WS_EX_TOPMOST;
 	// The installer supplies its complete title. Do not let the MDI framework
 	// append the active child/document title a second time.
@@ -228,11 +228,6 @@ void CMainFrame::OnSysCommand(UINT id, LPARAM parameter)
 void CMainFrame::SetInstallationActive(bool active)
 {
 	m_installationActive = active;
-	if (active)
-	{
-		SetWindowPos(&wndNoTopMost, 0, 0, 0, 0,
-			SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-	}
 	if (CMenu* systemMenu = GetSystemMenu(FALSE))
 		systemMenu->EnableMenuItem(SC_CLOSE, MF_BYCOMMAND |
 			(active ? MF_GRAYED : MF_ENABLED));
