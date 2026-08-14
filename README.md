@@ -1,6 +1,6 @@
 # kitsune Driver Installer
 
-- Windows Vista 及以上版本使用的 MFC 驱动安装程序。
+- Windows XP 及以上版本使用的 MFC 驱动安装程序。
 - 用于本人封装 Windows 系统时在部署过程中使用。
 - 程序主要由 Codex 设计。
 
@@ -10,7 +10,6 @@
 - 按硬件 ID 精确查询 Audio、Chipset、Network、Video 索引。
 - 分列显示驱动提供商、版本和日期，并默认勾选缺少驱动的设备。
 - 仅解压匹配 INF 所在子目录，再调用 `UpdateDriverForPlugAndPlayDevicesW` 安装。
-- 报告单项安装结果和重启要求。
 
 ## 只读自检（仅Codex使用）
 
