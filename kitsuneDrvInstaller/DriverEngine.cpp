@@ -1646,7 +1646,7 @@ namespace
 	}
 }
 
-bool DriverInstaller::Install(const std::wstring& dataRoot, const DeviceMatch& match,
+bool DriverInstaller::Install(HWND ownerWindow, const std::wstring& dataRoot, const DeviceMatch& match,
 	bool& rebootRequired, std::wstring& error, const LogCallback& log)
 {
 	rebootRequired = false;
@@ -1722,7 +1722,7 @@ bool DriverInstaller::Install(const std::wstring& dataRoot, const DeviceMatch& m
 		return false;
 	}
 	BOOL reboot = FALSE;
-	const BOOL installed = updateDriver(nullptr, match.hardwareId.c_str(), inf.c_str(), INSTALLFLAG_FORCE, &reboot);
+	const BOOL installed = updateDriver(ownerWindow, match.hardwareId.c_str(), inf.c_str(), INSTALLFLAG_FORCE, &reboot);
 	const DWORD installError = installed ? ERROR_SUCCESS : GetLastError();
 	FreeLibrary(newDev);
 	if (!installed)

@@ -108,7 +108,7 @@ class DriverInstaller
 public:
 	using LogCallback = std::function<void(const std::wstring&)>;
 
-	static bool Install(const std::wstring& dataRoot, const DeviceMatch& match,
+	static bool Install(HWND ownerWindow, const std::wstring& dataRoot, const DeviceMatch& match,
 		bool& rebootRequired, std::wstring& error, const LogCallback& log);
 	static std::wstring Find7Zip(const std::wstring& dataRoot);
 	static bool RunAfterInstallTests(std::wstring& error);

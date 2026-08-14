@@ -470,7 +470,7 @@ void CkitsuneDrvInstallerView::OnScan()
 	}
 	m_progress.SetPos(58);
 	int scanned = 0;
-	if (!DeviceScanner::Scan(m_catalog, m_matches, scanned, error))
+	if (!DeviceScanner::Scan(root, m_catalog, m_matches, scanned, error))
 	{
 		AppendLog(std::wstring(Tr(TextId::InstallFailureLog)) + error);
 		SetBusy(false);
@@ -599,6 +599,7 @@ void CkitsuneDrvInstallerView::OnInstall()
 	SetBusy(true);
 	CMainFrame* mainFrame = DYNAMIC_DOWNCAST(CMainFrame, AfxGetMainWnd());
 	if (mainFrame) mainFrame->SetInstallationActive(true);
+	const HWND ownerWindow = mainFrame ? mainFrame->GetSafeHwnd() : GetSafeHwnd();
 	m_progress.SetRange32(0, static_cast<int>(selected.size()));
 	m_progress.SetPos(0);
 	int success = 0;
@@ -609,7 +610,8 @@ void CkitsuneDrvInstallerView::OnInstall()
 		AppendLog(std::wstring(Tr(TextId::StartInstall)) + match.displayName);
 		bool reboot = false;
 		std::wstring error;
-		if (DriverInstaller::Install(root, match, reboot, error, [this](const std::wstring& line) { AppendLog(line); }))
+		if (DriverInstaller::Install(ownerWindow, root, match, reboot, error,
+			[this](const std::wstring& line) { AppendLog(line); }))
 		{
 			++success;
 			m_devices.SetItemText(row, 4, reboot ? Tr(TextId::InstalledReboot) : Tr(TextId::InstalledSuccess));
