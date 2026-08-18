@@ -1,4 +1,4 @@
-# kitsune Driver Installer
+# kiri Driver Installer
 
 - Windows XP 及以上版本使用的 MFC 驱动安装程序。
 - 自用于封装 Windows 系统时在部署过程中使用。
