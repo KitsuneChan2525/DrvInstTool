@@ -18,6 +18,7 @@ public:
 	void CancelAiCountdownForUserInput();
 	static std::wstring FormatTimestampedLogForTest(const std::wstring& text, unsigned hour,
 		unsigned minute, unsigned second);
+	static bool RunLayoutTests(std::wstring& error);
 
 #ifdef _DEBUG
 	virtual void AssertValid() const;

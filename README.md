@@ -14,5 +14,5 @@
 ## 只读自检（仅 Codex 自动测试使用）
 
 ```powershell
-.\kitsuneDrvInstaller.exe --self-test 'D:\Project\DrvInst\Win7\x64\Data' '.\self-test.json'
+& '.\kiri Driver Installer.exe' --self-test 'D:\Projects\DriverPkgs\Win7\x64\Data' '.\self-test.json'
 ```

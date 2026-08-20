@@ -78,7 +78,7 @@ int CMainFrame::OnCreate(LPCREATESTRUCT createStruct)
 void CMainFrame::RefreshVersionStatus()
 {
 	if (!m_statusBar.GetSafeHwnd()) return;
-	CString text = L"kitsune Driver Installer - ";
+	CString text = L"kiri Driver Installer - ";
 	switch (Localization::GetLanguage())
 	{
 	case UiLanguage::ChineseSimplified: text += L"版本："; break;
@@ -101,7 +101,7 @@ void CMainFrame::RefreshWindowTitle()
 		(executablePath.substr(0, slash) + L"\\Data");
 	std::wstring targetSystem;
 	std::wstring targetArchitecture;
-	std::wstring title = L"kitsune Driver Installer";
+	std::wstring title = L"kiri Driver Installer";
 	if (SystemCompatibility::GetDriverMediaTarget(
 		dataRoot, targetSystem, targetArchitecture))
 	{

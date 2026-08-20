@@ -2,7 +2,7 @@ param(
     [string]$VisualStudioRoot = 'C:\Tools\Build\VS2022',
     [string]$WindowsSdk71A = 'C:\Tools\Build\WindowsSDK\v7.1A',
     [string]$UniversalCrtRoot = 'C:\Tools\Build\WindowsKits10',
-    [string]$OutputRoot = 'D:\Project\DrvInst\WinXP'
+    [string]$OutputRoot = 'D:\Projects\DriverPkgs\WinXP'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,6 +49,6 @@ $obj = Join-Path $buildRoot 'obj-x86\'
     /p:PlatformToolset=v141_xp /p:WindowsSdkDir_71A="$sdk" /p:OutDir="$out" /p:IntDir="$obj"
 if ($LASTEXITCODE -ne 0) { throw "XP x86 build failed: $LASTEXITCODE" }
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
-Copy-Item -LiteralPath (Join-Path $out 'kitsuneDrvInstaller.exe') -Destination $OutputRoot -Force
+Copy-Item -LiteralPath (Join-Path $out 'kiri Driver Installer.exe') -Destination $OutputRoot -Force
 
-Write-Output "Windows XP x86 build deployed to $OutputRoot\kitsuneDrvInstaller.exe"
+Write-Output "Windows XP x86 build deployed to $OutputRoot\kiri Driver Installer.exe"

@@ -7,7 +7,7 @@ namespace
 
 	const wchar_t* const kText[static_cast<size_t>(TextId::Count)][3] =
 	{
-		{ L"kitsune Driver Installer", L"kitsune Driver Installer", L"kitsune Driver Installer" },
+		{ L"kiri Driver Installer", L"kiri Driver Installer", L"kiri Driver Installer" },
 		{ L"Driver installation", L"驱动安装", L"驅動程式安裝" },
 		{ L"Driver package target system", L"驱动程序包目标系统", L"驅動程式套件目標系統" },
 		{ L"Language", L"语言", L"語言" },

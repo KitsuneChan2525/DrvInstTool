@@ -52,7 +52,7 @@ CkitsuneDrvInstallerApp::CkitsuneDrvInstallerApp() noexcept
 
 	// TODO: 将以下应用程序 ID 字符串替换为唯一的 ID 字符串；建议的字符串格式
 	//为 CompanyName.ProductName.SubProduct.VersionInformation
-	SetAppID(_T("kitsune.DriverInstaller.1"));
+	SetAppID(_T("kiri.DriverInstaller.1"));
 
 	// TODO:  在此处添加构造代码，
 	// 将所有重要的初始化放置在 InitInstance 中
@@ -151,6 +151,8 @@ namespace
 			L"line one\r\nline two\nline three", 1, 2, 3);
 		const bool timestampedLogLinesOk = multilineLog ==
 			L"[01:02:03] line one\r\n[01:02:03] line two\r\n[01:02:03] line three";
+		std::wstring layoutError;
+		const bool layout640x400Ok = CkitsuneDrvInstallerView::RunLayoutTests(layoutError);
 		std::wstring mediaCompatibilityError;
 		const bool mediaCompatibilityOk = SystemCompatibility::ValidateDriverMedia(dataRoot, mediaCompatibilityError);
 		std::wstring mediaTargetSystem;
@@ -161,7 +163,7 @@ namespace
 		std::vector<DeviceMatch> matches;
 		int scanned = 0;
 		bool scanOk = false;
-		if (catalogLoaded) scanOk = DeviceScanner::Scan(catalog, matches, scanned, error);
+		if (catalogLoaded) scanOk = DeviceScanner::Scan(dataRoot, catalog, matches, scanned, error);
 		size_t missingDrivers = 0, updateDrivers = 0, installedDrivers = 0;
 		size_t systemBuiltInDrivers = 0;
 		for (const auto& match : matches)
@@ -196,6 +198,8 @@ namespace
 			<< "  \"after_install_error\": \"" << JsonEscapeUtf8(afterInstallError) << "\",\n"
 			<< "  \"timestamped_log_lines_ok\": " << (timestampedLogLinesOk ? "true" : "false") << ",\n"
 			<< "  \"timestamped_log_output\": \"" << JsonEscapeUtf8(multilineLog) << "\",\n"
+			<< "  \"layout_640x400_ok\": " << (layout640x400Ok ? "true" : "false") << ",\n"
+			<< "  \"layout_640x400_error\": \"" << JsonEscapeUtf8(layoutError) << "\",\n"
 			<< "  \"media_compatibility_ok\": " << (mediaCompatibilityOk ? "true" : "false") << ",\n"
 			<< "  \"media_compatibility_error\": \"" << JsonEscapeUtf8(mediaCompatibilityError) << "\",\n"
 			<< "  \"media_target_ok\": " << (mediaTargetOk ? "true" : "false") << ",\n"

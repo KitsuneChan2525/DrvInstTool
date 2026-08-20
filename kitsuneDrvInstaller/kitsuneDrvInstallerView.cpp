@@ -28,6 +28,91 @@ namespace
 	constexpr UINT_PTR AI_INSTALL_TIMER = 2;
 	constexpr UINT_PTR AI_EXIT_TIMER = 3;
 
+	struct InstallerLayout
+	{
+		CRect title;
+		CRect languageLabel;
+		CRect language;
+		CRect scan;
+		CRect selectRecommended;
+		CRect install;
+		CRect devices;
+		CRect progress;
+		CRect logLabel;
+		CRect log;
+		int columnWidths[5] = {};
+	};
+
+	InstallerLayout ComputeInstallerLayout(int width, int height,
+		int titleTextHeight, int uiTextHeight)
+	{
+		InstallerLayout layout;
+		const bool ultraCompact = width < 700 || height < 450;
+		const bool compact = ultraCompact || width < 900 || height < 650;
+		const int margin = ultraCompact ? 6 : (compact ? 12 : 22);
+		const int gap = ultraCompact ? 4 : (compact ? 6 : 8);
+		const int contentWidth = max(1, width - margin * 2);
+		const int titleTop = ultraCompact ? 2 : (compact ? 5 : 12);
+		const int titleHeight = max(ultraCompact ? 24 : (compact ? 30 : 36),
+			titleTextHeight + (ultraCompact ? 2 : (compact ? 6 : 12)));
+		const int languageWidth = ultraCompact ? 108 : (compact ? 140 : 172);
+		const int languageLabelWidth = ultraCompact ? 44 : (compact ? 58 : 74);
+		const int languageX = width - margin - languageWidth;
+		const int languageLabelX = languageX - gap - languageLabelWidth;
+		layout.title = CRect(margin, titleTop,
+			max(margin + 1, languageLabelX - gap), titleTop + titleHeight);
+		layout.languageLabel = CRect(languageLabelX,
+			titleTop + (ultraCompact ? 1 : (compact ? 3 : 5)),
+			languageX - gap, titleTop + (ultraCompact ? 23 : 27));
+		layout.language = CRect(languageX, titleTop + 1,
+			languageX + languageWidth, titleTop + 25);
+
+		const int scanWidth = ultraCompact ? 72 : (compact ? 90 : 112);
+		const int selectWidth = ultraCompact ? 88 : (compact ? 110 : 140);
+		const int installWidth = ultraCompact ? 88 : (compact ? 110 : 140);
+		const int installX = width - margin - installWidth;
+		const int selectX = installX - gap - selectWidth;
+		const int scanX = selectX - gap - scanWidth;
+		const int actionsTop = titleTop + titleHeight + (ultraCompact ? 2 : gap);
+		const int actionHeight = ultraCompact ? 24 : (compact ? 28 : 32);
+		layout.scan = CRect(scanX, actionsTop, scanX + scanWidth, actionsTop + actionHeight);
+		layout.selectRecommended = CRect(selectX, actionsTop,
+			selectX + selectWidth, actionsTop + actionHeight);
+		layout.install = CRect(installX, actionsTop,
+			installX + installWidth, actionsTop + actionHeight);
+
+		const int devicesTop = actionsTop + actionHeight + (ultraCompact ? 3 : (compact ? 7 : 11));
+		const int logHeight = ultraCompact ? max(48, min(64, height / 6))
+			: (compact ? max(78, min(105, height / 5)) : max(96, min(150, height / 5)));
+		const int logTop = height - margin - logHeight;
+		const int logLabelHeight = max(ultraCompact ? 18 : (compact ? 24 : 26),
+			uiTextHeight + (ultraCompact ? 2 : 6));
+		const int progressHeight = ultraCompact ? 8 : (compact ? 13 : 17);
+		const int logLabelY = logTop - logLabelHeight - (ultraCompact ? 1 : 2);
+		const int progressY = logLabelY - gap - progressHeight;
+		const int devicesBottom = max(devicesTop + 1, progressY - gap);
+		layout.devices = CRect(margin, devicesTop, margin + contentWidth, devicesBottom);
+		layout.progress = CRect(margin, progressY, margin + contentWidth, progressY + progressHeight);
+		layout.logLabel = CRect(margin, logLabelY, min(width - margin, margin + 160),
+			logLabelY + logLabelHeight);
+		layout.log = CRect(margin, logTop, margin + contentWidth,
+			max(logTop + 1, height - margin));
+
+		const int columnWidth = max(5, contentWidth - 4);
+		layout.columnWidths[1] = columnWidth * 20 / 100;
+		layout.columnWidths[2] = columnWidth * 15 / 100;
+		layout.columnWidths[3] = columnWidth * 15 / 100;
+		layout.columnWidths[4] = columnWidth * 13 / 100;
+		layout.columnWidths[0] = columnWidth - layout.columnWidths[1] -
+			layout.columnWidths[2] - layout.columnWidths[3] - layout.columnWidths[4];
+		return layout;
+	}
+
+	bool RectInside(const CRect& rect, int width, int height)
+	{
+		return rect.left >= 0 && rect.top >= 0 && rect.right <= width &&
+			rect.bottom <= height && rect.Width() > 0 && rect.Height() > 0;
+	}
 	bool FileExists(const std::wstring& path)
 	{
 		return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES;
@@ -139,7 +224,7 @@ int CkitsuneDrvInstallerView::OnCreate(LPCREATESTRUCT createStruct)
 	Localization::SetLanguage(Localization::DetectSystemLanguage());
 	m_aiMode = theApp.IsAiMode();
 	m_aiInteractionEnabled = !m_aiMode;
-	m_title.Create(L"", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE | SS_NOPREFIX, CRect(), this);
+	m_title.Create(L"", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE | SS_NOPREFIX | SS_ENDELLIPSIS, CRect(), this);
 	m_title.SetFont(&m_titleFont);
 	m_languageLabel.Create(L"", WS_CHILD | WS_VISIBLE | SS_RIGHT, CRect(), this);
 	m_languageLabel.SetFont(&m_uiFont);
@@ -223,10 +308,6 @@ void CkitsuneDrvInstallerView::OnSize(UINT type, int cx, int cy)
 
 void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 {
-	const bool compact = width < 900 || height < 650;
-	const int margin = compact ? 12 : 22;
-	const int gap = compact ? 6 : 8;
-	const int contentWidth = max(300, width - margin * 2);
 	CClientDC dc(this);
 	CFont* previousFont = dc.SelectObject(&m_titleFont);
 	TEXTMETRICW titleMetrics = {};
@@ -235,68 +316,54 @@ void CkitsuneDrvInstallerView::LayoutControls(int width, int height)
 	TEXTMETRICW uiMetrics = {};
 	dc.GetTextMetricsW(&uiMetrics);
 	dc.SelectObject(previousFont);
-	const int titleTop = compact ? 5 : 12;
-	const int titleHeight = max(compact ? 30 : 36,
-		titleMetrics.tmHeight + titleMetrics.tmExternalLeading + (compact ? 6 : 12));
-
-	// Header: keep the language selector at the upper-right and reserve the
-	// remaining width for the package title so the controls never overlap.
-	const int languageWidth = compact ? 140 : 172;
-	const int languageLabelWidth = compact ? 58 : 74;
-	const int languageX = width - margin - languageWidth;
-	const int languageLabelX = languageX - gap - languageLabelWidth;
-	m_title.MoveWindow(margin, titleTop, max(120, languageLabelX - margin - 14), titleHeight);
-	m_languageLabel.MoveWindow(languageLabelX, titleTop + (compact ? 3 : 5), languageLabelWidth, 24);
-	m_language.SetWindowPos(nullptr, languageX, titleTop + 1, languageWidth, 240,
-		SWP_NOZORDER | SWP_SHOWWINDOW);
-
-	// All three actions share the row below the title.
-	const int scanWidth = compact ? 90 : 112;
-	const int selectWidth = compact ? 110 : 140;
-	const int installWidth = compact ? 110 : 140;
-	const int installX = width - margin - installWidth;
-	const int selectX = installX - gap - selectWidth;
-	const int scanX = selectX - gap - scanWidth;
-	const int actionsTop = titleTop + titleHeight + gap;
-	const int actionHeight = compact ? 28 : 32;
-	m_scan.MoveWindow(scanX, actionsTop, scanWidth, actionHeight);
-	m_selectRecommended.MoveWindow(selectX, actionsTop, selectWidth, actionHeight);
-	m_install.MoveWindow(installX, actionsTop, installWidth, actionHeight);
-
-	// The device list receives all flexible vertical space. Progress and log
-	// areas stay anchored to the bottom for a stable layout at every size.
-	const int devicesTop = actionsTop + actionHeight + (compact ? 7 : 11);
-	const int logHeight = compact ? max(78, min(105, height / 5)) : max(96, min(150, height / 5));
-	const int logTop = height - margin - logHeight;
-	// Derive the label height from the selected UI font. A fixed 19-pixel
-	// height clipped CJK glyphs at high DPI and on the compact 800x600 layout.
-	const int logLabelHeight = max(compact ? 24 : 26,
-		uiMetrics.tmHeight + uiMetrics.tmExternalLeading + 6);
-	const int progressHeight = compact ? 13 : 17;
-	const int logLabelY = logTop - logLabelHeight - 2;
-	const int progressY = logLabelY - gap - progressHeight;
-	const int devicesBottom = progressY - gap;
-	const int listHeight = max(100, devicesBottom - devicesTop);
-	m_devices.MoveWindow(margin, devicesTop, contentWidth, listHeight);
-	m_progress.MoveWindow(margin, devicesTop + listHeight + gap, contentWidth, progressHeight);
-	m_logLabel.MoveWindow(margin, logLabelY, 160, logLabelHeight);
-	m_log.MoveWindow(margin, logTop, contentWidth, max(50, height - logTop - margin));
-
-	// Fill the available width at every resolution instead of retaining the
-	// original 1000-pixel column set and forcing horizontal scrolling.
-	const int columnWidth = max(300, contentWidth - 4);
-	const int providerWidth = columnWidth * 20 / 100;
-	const int versionWidth = columnWidth * 15 / 100;
-	const int dateWidth = columnWidth * 15 / 100;
-	const int statusWidth = columnWidth * 13 / 100;
-	const int deviceWidth = columnWidth - providerWidth - versionWidth - dateWidth - statusWidth;
-	m_devices.SetColumnWidth(0, deviceWidth);
-	m_devices.SetColumnWidth(1, providerWidth);
-	m_devices.SetColumnWidth(2, versionWidth);
-	m_devices.SetColumnWidth(3, dateWidth);
-	m_devices.SetColumnWidth(4, statusWidth);
+	const InstallerLayout layout = ComputeInstallerLayout(width, height,
+		titleMetrics.tmHeight + titleMetrics.tmExternalLeading,
+		uiMetrics.tmHeight + uiMetrics.tmExternalLeading);
+	m_title.MoveWindow(layout.title);
+	m_languageLabel.MoveWindow(layout.languageLabel);
+	m_language.SetWindowPos(nullptr, layout.language.left, layout.language.top,
+		layout.language.Width(), 240, SWP_NOZORDER | SWP_SHOWWINDOW);
+	m_scan.MoveWindow(layout.scan);
+	m_selectRecommended.MoveWindow(layout.selectRecommended);
+	m_install.MoveWindow(layout.install);
+	m_devices.MoveWindow(layout.devices);
+	m_progress.MoveWindow(layout.progress);
+	m_logLabel.MoveWindow(layout.logLabel);
+	m_log.MoveWindow(layout.log);
+	for (int index = 0; index < 5; ++index)
+		m_devices.SetColumnWidth(index, layout.columnWidths[index]);
 }
 
+bool CkitsuneDrvInstallerView::RunLayoutTests(std::wstring& error)
+{
+	// A 640x400 monitor leaves roughly 600x280 client pixels after the fixed
+	// frame, caption, status bar and taskbar are removed. Conservative font
+	// metrics also cover classic Windows and high-DPI text.
+	const int width = 600;
+	const int height = 280;
+	const InstallerLayout layout = ComputeInstallerLayout(width, height, 30, 22);
+	const CRect controls[] = { layout.title, layout.languageLabel, layout.language,
+		layout.scan, layout.selectRecommended, layout.install, layout.devices,
+		layout.progress, layout.logLabel, layout.log };
+	for (const CRect& control : controls)
+	{
+		if (RectInside(control, width, height)) continue;
+		error = L"640x400 layout places a control outside the client area";
+		return false;
+	}
+	if (layout.title.right > layout.languageLabel.left ||
+		layout.scan.right > layout.selectRecommended.left ||
+		layout.selectRecommended.right > layout.install.left ||
+		layout.devices.bottom > layout.progress.top ||
+		layout.progress.bottom > layout.logLabel.top ||
+		layout.logLabel.bottom > layout.log.top)
+	{
+		error = L"640x400 layout contains overlapping controls";
+		return false;
+	}
+	error.clear();
+	return true;
+}
 bool CkitsuneDrvInstallerView::InitializeLanguageSelector()
 {
 	if (!m_language.GetSafeHwnd()) return false;
@@ -684,7 +751,7 @@ void CkitsuneDrvInstallerView::ApplyLanguage()
 
 void CkitsuneDrvInstallerView::UpdateTitle()
 {
-	const std::wstring applicationTitle = L"kitsune Driver Installer";
+	const std::wstring applicationTitle = L"kiri Driver Installer";
 	m_title.SetWindowTextW(applicationTitle.c_str());
 	std::wstring targetSystem;
 	std::wstring targetArchitecture;
