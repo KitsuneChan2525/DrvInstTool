@@ -392,7 +392,7 @@ BEGIN
             VALUE "FileDescription", "kiri Driver Installer"
             VALUE "FileVersion", "1.0.2.15"
             VALUE "InternalName", "kiri Driver Installer.exe"
-            VALUE "LegalCopyright", "? Kirifox Project. All rights reserved."
+            VALUE "LegalCopyright", L"\x00A9 Kirifox Project. All rights reserved."
             VALUE "OriginalFilename", "KDI.exe"
             VALUE "ProductName", "kiri Driver Installer"
             VALUE "ProductVersion", "1.0.0.0"
