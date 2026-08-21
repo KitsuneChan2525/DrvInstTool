@@ -3,12 +3,46 @@
 #include "kitsuneDrvInstaller.h"
 #include "MainFrm.h"
 #include "Localization.h"
-#include "AppVersion.h"
+#include <vector>
+#include <winver.h>
+#pragma comment(lib, "Version.lib")
 #include "DriverEngine.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+
+namespace
+{
+	CString ReadExecutableFileVersion()
+	{
+		wchar_t modulePath[MAX_PATH] = {};
+		if (GetModuleFileNameW(nullptr, modulePath, _countof(modulePath)) == 0)
+			return CString();
+
+		DWORD handle = 0;
+		const DWORD infoSize = GetFileVersionInfoSizeW(modulePath, &handle);
+		if (infoSize == 0)
+			return CString();
+
+		std::vector<BYTE> versionData(infoSize);
+		if (!GetFileVersionInfoW(modulePath, 0, infoSize, versionData.data()))
+			return CString();
+
+		VS_FIXEDFILEINFO* fixedInfo = nullptr;
+		UINT fixedInfoSize = 0;
+		if (!VerQueryValueW(versionData.data(), L"\\", reinterpret_cast<void**>(&fixedInfo), &fixedInfoSize) ||
+			fixedInfo == nullptr || fixedInfoSize < sizeof(VS_FIXEDFILEINFO) ||
+			fixedInfo->dwSignature != 0xFEEF04BD)
+			return CString();
+
+		CString version;
+		version.Format(L"%u.%u.%u.%u",
+			HIWORD(fixedInfo->dwFileVersionMS), LOWORD(fixedInfo->dwFileVersionMS),
+			HIWORD(fixedInfo->dwFileVersionLS), LOWORD(fixedInfo->dwFileVersionLS));
+		return version;
+	}
+}
 
 IMPLEMENT_DYNAMIC(CMainFrame, CMDIFrameWndEx)
 
@@ -85,7 +119,8 @@ void CMainFrame::RefreshVersionStatus()
 	case UiLanguage::ChineseTraditional: text += L"版本："; break;
 	default: text += L"Version: "; break;
 	}
-	text += APP_FILE_VERSION_WSTRING;
+	const CString executableVersion = ReadExecutableFileVersion();
+	text += executableVersion.IsEmpty() ? L"Unknown" : executableVersion;
 	CString current;
 	m_statusBar.GetPaneText(0, current);
 	if (current != text) m_statusBar.SetPaneText(0, text);
